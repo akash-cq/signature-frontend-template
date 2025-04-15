@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import MainAreaLayout from "../components/main-layout/main-layout";
 import { Button, Modal, Form, Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
@@ -8,7 +8,7 @@ import { useParams } from "react-router";
 import { requestClient } from "../store";
 
 const RequestPage: React.FC = () => {
-  const templateId = useParams()?.id;
+  const templateId: string | any = useParams()?.id;
   const [ModalDrawer, setModalDrawer] = useState(false);
   const [loading, setLoading] = useState(false);
   const [ExcelData, setExcelData] = useState<any[]>([]);
@@ -23,14 +23,14 @@ const RequestPage: React.FC = () => {
       console.log(info.document.file);
       const [data, headers] = await readExcelFile(info.document.file);
       console.table(data);
-		await requestClient.sendExcelData({templateId,data});
+      await requestClient.sendExcelData({ templateId, data });
       const temp = Object.keys(data[0]).map((key) => ({
         title: key,
         dataIndex: key,
         key: key,
       }));
       setColumns(temp);
-      setExcelData(data);
+      setExcelData((prev) => [...prev, ExcelData]);
     } catch (error: any) {
       console.log(error);
       message.error(error.message);
@@ -39,6 +39,23 @@ const RequestPage: React.FC = () => {
     }
   };
 
+  const fetchData = async () => {
+    try {
+      const data = await requestClient.getDataExcel(templateId);
+      const temp = Object.keys(data[0]).map((key) => ({
+        title: key,
+        dataIndex: key,
+        key: key,
+      }));
+      setColumns(temp);
+      setExcelData(data);
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
+  useEffect(()=>{
+		fetchData()
+  },[])
   return (
     <MainAreaLayout
       title="Request Management"
