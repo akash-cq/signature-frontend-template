@@ -11,7 +11,7 @@ const readExcelFile = async (file: File) => {
 
   if (jsonData.length == 0) throw new Error("file is empty");
   if (jsonData.length == 1) throw new Error("file is empty only have headers");
-  const jsonDataa = XLSX.utils.sheet_to_json(worksheet);
+  const jsonDataa = XLSX.utils.sheet_to_json(worksheet, { raw: false });
   const headers: any = jsonData[0];
   jsonDataa.forEach((obj: any) => {
     const keys = Object.keys(obj);

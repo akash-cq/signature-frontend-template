@@ -62,21 +62,28 @@ export class RequestClient extends Client {
     const res = await this.request("PATCH", `/api/templates/${templateId}`, {
       data: data,
     });
-    return res.data;
+    return;
   }
   async getDataExcel(id: string) {
     const res = await this.request("GET", `/api/templates/${id}`);
     if (res.status != 200) {
       throw new Error("invalid data for backend");
     }
-    console.log(res)
+    console.log(res);
     const headers = res.data?.placeholder;
     const data = res.data?.finaldata;
-    const url = res.data?.url
-    return [data,headers,url]
+    const url = res.data?.url;
+    const metadata = res.data?.metadata
+    return [data, headers, url, metadata];
   }
-  async downloadTemplate(url: string) {
-      const res = await this.request('GET',url)
-      return res;
+  async deleteRequest(id: string) {
+    await this.request("DELETE", `/api/templates/${id}`);
+    return;
+  }
+  async sendToOfficer(requests: { selectedOfficer: string; Request: any }) {
+    const res = await this.request("POST", "/api/templates/assign", {
+      data: requests,
+    });
+    return res;
   }
 }

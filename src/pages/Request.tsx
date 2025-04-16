@@ -5,16 +5,27 @@ import { UploadOutlined } from "@ant-design/icons";
 import readExcelFile from "../service/ReadFile";
 import CustomTable from "../components/CustomTable";
 import { Link, useParams } from "react-router";
-import { requestClient } from "../store";
-
+import { requestClient, useAppStore } from "../store";
+import { signStatus } from "../libs/constants";
+interface metaData {
+  id: string;
+  assignedTo: string;
+  createdBy: string;
+  status: number;
+  signStatus: number;
+}
 const RequestPage: React.FC = () => {
+  const session = useAppStore().session?.userId;
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
   const templateId: string | any = useParams()?.id;
+  const [metadata, setMetaData] = useState<metaData | null>(null);
   const [ModalDrawer, setModalDrawer] = useState(false);
-  const [form] = Form.useForm()
+  const [form] = Form.useForm();
   const [loading, setLoading] = useState(false);
   const [ExcelData, setExcelData] = useState<any[]>([]);
   const [columns, setColumns] = useState<any[]>([]);
-  const [url,setUrl] = useState<string>('');
+  const [url, setUrl] = useState<string>("");
   const [, setCurrentPage] = useState<number>(1);
 
   const uploadFile = async (info: any) => {
@@ -25,10 +36,15 @@ const RequestPage: React.FC = () => {
       console.log(info.document.file);
       const data = await readExcelFile(info.document.file);
       console.table(data);
-      await requestClient.sendExcelData({ templateId, data });
-      setExcelData((prev) => [...prev, ...data]);
+       await requestClient.sendExcelData({ templateId, data });
+       const finalCalculateData = data.map((obj:any)=>{
+        obj.signStatus = signStatus.unsigned
+        return obj;
+       })
+       console.log(finalCalculateData)
+      setExcelData((prev) => [...prev, ...finalCalculateData]);
       setModalDrawer(false);
-        form.resetFields()
+      form.resetFields();
     } catch (error: any) {
       console.log(error);
       message.error(error.message);
@@ -39,9 +55,10 @@ const RequestPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const [data,headers,url] = await requestClient.getDataExcel(templateId);
-      console.log(headers,data)
-      const temp:any = headers.map((key:Object) => ({
+      const [data, headers, url, metadata] =
+        await requestClient.getDataExcel(templateId);
+      console.log(headers, data);
+      const temp: any = headers.map((key: Object) => ({
         title: key,
         dataIndex: key,
         key: key,
@@ -65,33 +82,39 @@ const RequestPage: React.FC = () => {
       );
       setColumns(temp);
       setUrl(url);
-      if(data)
-      setExcelData((data));
+      setMetaData(metadata);
+      if (data) setExcelData(data);
     } catch (error: any) {
       message.error(error.message);
     }
   };
-  const downloadTemplate = async ()=>{
-    try{
-        const res = await requestClient.downloadTemplate(url)
-        console.log(res)
-    }catch(err:any){
-      message.error(err.message)
-    }
-  }
-  useEffect(()=>{
-		fetchData()
-  },[])
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
   return (
     <MainAreaLayout
       title="Request Management"
       extra={
         <>
-          <Button type="primary" onClick={() => setModalDrawer(true)}>
-            Upload File
-          </Button>
+          {metadata?.createdBy === session && (
+            <Button
+              type="primary"
+              onClick={() => {
+                if (metadata?.signStatus === signStatus.unsigned)
+                  setModalDrawer(true);
+                else
+                  message.error(
+                    "You are already submited for the signing process"
+                  );
+              }}
+            >
+              Upload Excel File
+            </Button>
+          )}
           <Button type="primary">
-            <Link to={`http://localhost:3000/${url}`}>Download File</Link>
+            <Link to={`${backendUrl}/${url}`}>Download Template</Link>
           </Button>
         </>
       }

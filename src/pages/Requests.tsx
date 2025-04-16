@@ -13,10 +13,10 @@ import MainAreaLayout from "../components/main-layout/main-layout";
 import { useEffect, useState } from "react";
 import CustomTable from "../components/CustomTable";
 import { AxiosError } from "axios";
-import { requestClient } from "../store";
+import { requestClient, useAppStore } from "../store";
 import { UploadOutlined } from "@ant-design/icons";
-import { useNavigate } from "react-router";
-// import { rolesMap } from "../libs/statusMap";
+import { Link, useNavigate } from "react-router";
+import { signStatus } from "../libs/constants";
 interface officers {
   id: String;
   name: String;
@@ -29,14 +29,20 @@ interface requests {
   status: number;
   url: string;
   signStatus: number;
+  createdBy: string;
+  DocCount:any
 }
 const Requests: React.FC = () => {
-  const navigate = useNavigate()
+  const navigate = useNavigate();
+  const session = useAppStore().session?.userId;
+const backendUrl = import.meta.env.VITE_BACKEND_URL;
+
   const [data, setdata] = useState<requests[]>([]);
   const [loading, setLoading] = useState(false);
   const [, setCurrentPage] = useState<number>(1);
   const [selectedOfficer, setSelectedOfficer] = useState<string>("");
   const [officers, setOfficers] = useState<officers[]>([]);
+  const [Request, setRequest] = useState<requests | null>(null);
   const [officerDrawer, setOfficerDrawer] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [form] = Form.useForm();
@@ -74,8 +80,8 @@ const Requests: React.FC = () => {
     setIsDrawerOpen(true);
   };
   const handleOfficerChange = (value: string) => {
-    console.log(value)
-   setSelectedOfficer(value);
+    console.log(value);
+    setSelectedOfficer(value);
   };
   const fileSelect = (info: any) => {
     if (info.fileList.length == 0) {
@@ -106,24 +112,48 @@ const Requests: React.FC = () => {
   const sendSignHandle = async () => {
     try {
       console.log(selectedOfficer);
+      try {
+        const res = await requestClient.sendToOfficer({
+          selectedOfficer,
+          Request,
+        });
+        console.log(res);
+        setOfficerDrawer(false);
+        OfficerForm.resetFields();
+        setdata((prev) =>
+          prev.map((obj) => {
+            if (obj.id === Request?.id) return { ...obj, signStatus: 1 };
+            return obj;
+          })
+        );
+      } catch (err: any) {
+        message.error(err.message);
+      }
     } catch (error) {
       message.error("network error");
+    }
+  };
+  const deletRequest = async (id: string) => {
+    try {
+      await requestClient.deleteRequest(id);
+      setdata((prev) => prev.filter((obj: any) => obj.id != id));
+      message.success("Request is deleted");
+    } catch (error: any) {
+      message.error(error.message);
     }
   };
   useEffect(() => {
     fetchData();
   }, []);
-  // console.log(data);
   const columns = [
     {
       title: "Request Name",
       dataIndex: "templateName",
       key: "templateName",
-      render: (text: string,record:requests) => {
-        
+      render: (text: string, record: requests) => {
         return (
-          <Button type="link" onClick={() => alert(record.id) }>
-            {text}
+          <Button type="link">
+            <Link to={`${backendUrl}/${record.url}`}>{text}</Link>
           </Button>
         );
       },
@@ -132,7 +162,7 @@ const Requests: React.FC = () => {
       title: "Number Of Document",
       dataIndex: "DocCount",
       key: "DocCount",
-      render: (text: number,record:requests) => {
+      render: (text: number, record: requests) => {
         return (
           <Button
             type="link"
@@ -166,9 +196,9 @@ const Requests: React.FC = () => {
       key: "rqststatus",
       render: (text: number) => {
         if (text == 0) {
-          return <>Draft</>
+          return <>Draft</>;
         } else if (text == 1) {
-          return <>Send For Signed</>;
+          return <>Waiting For Sign</>;
         } else if (text == 3) {
           return <>Delegated</>;
         } else if (text == 5) {
@@ -182,24 +212,43 @@ const Requests: React.FC = () => {
       title: "Action",
       dataIndex: "signStatus",
       key: "action",
-      render: (action: number) => {
-        if (action == 0) {
-          return (
-            <Flex justify="center" gap={3}>
-              <Button onClick={() => setOfficerDrawer(true)}>Send</Button>
-              <Popconfirm
-                title="Delete this court?"
-                onConfirm={() => alert("record.id")}
-              >
-                <Button danger>Delete</Button>
-              </Popconfirm>
-              <Button>Download</Button>
-            </Flex>
-          );
-        } else if (action == 3) {
-          <>
-            <Button>Signed</Button>
-          </>;
+      render: (action: number, request: requests) => {
+        if (request.createdBy === session) {
+          if (action == signStatus.unsigned && request.createdBy === session ) {
+            return (
+              <Flex justify="space-around" gap={5}>
+                <Button
+                  onClick={() => {
+                    if(request.DocCount!=0)
+                    setOfficerDrawer(true), setRequest(request);
+                  else
+                    message.error("no document is uploaded")
+                  }}
+                >
+                  Send
+                </Button>
+                <Popconfirm
+                  title="Delete this court?"
+                  onConfirm={() => deletRequest(request.id)}
+                >
+                  <Button danger>Delete</Button>
+                </Popconfirm>
+                <Button>Clone</Button>
+              </Flex>
+            );
+          } else if (action == signStatus.readyForSign) {
+            return <Button>Clone</Button>;
+          }
+        }else{
+          if(action==signStatus.readyForSign){
+            return (
+              <Flex justify="space-around" gap={6}>
+                <Button>Sign All</Button>
+                <Button>Reject</Button>
+                <Button>Delegate</Button>
+              </Flex>
+            );
+          }
         }
       },
     },
