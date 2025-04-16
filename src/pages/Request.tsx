@@ -36,12 +36,12 @@ const RequestPage: React.FC = () => {
       console.log(info.document.file);
       const data = await readExcelFile(info.document.file);
       console.table(data);
-       await requestClient.sendExcelData({ templateId, data });
-       const finalCalculateData = data.map((obj:any)=>{
-        obj.signStatus = signStatus.unsigned
+      await requestClient.sendExcelData({ templateId, data });
+      const finalCalculateData = data.map((obj: any) => {
+        obj.signStatus = signStatus.unsigned;
         return obj;
-       })
-       console.log(finalCalculateData)
+      });
+      console.log(finalCalculateData);
       setExcelData((prev) => [...prev, ...finalCalculateData]);
       setModalDrawer(false);
       form.resetFields();
@@ -77,6 +77,16 @@ const RequestPage: React.FC = () => {
             if (status == 3) return <>Delegated</>;
             else if (status == 0) return <>Unsigned</>;
             else if (status == 5) return <>Signed</>;
+          },
+        },
+        {
+          title: "Action",
+          dataIndex: "signStatus",
+          key: "Action",
+          render: (status: number) => {
+            if (status == 3) return <Button>Preview</Button>;
+            else if (status == 0) return <Button danger>Delete</Button>;
+            else if (status == 5) return <Button type="primary">Download</Button>;
           },
         }
       );

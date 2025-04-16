@@ -1,6 +1,8 @@
 import * as XLSX from "xlsx";
 
 const readExcelFile = async (file: File) => {
+  console.log(file)
+  if(file.type!='application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' && file.type!='text/csv')throw new Error("excel sheet not found")
   const data = await file.arrayBuffer();
   const workbook = XLSX.read(data);
   const worksheet = workbook.Sheets[workbook.SheetNames[0]];
