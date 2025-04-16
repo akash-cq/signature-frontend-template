@@ -65,14 +65,18 @@ export class RequestClient extends Client {
     return res.data;
   }
   async getDataExcel(id: string) {
-       const res = await this.request(
-         "GET",
-         `/api/templates/${id}`
-       );
-       if (res.status != 200) {
-         throw new Error("invalid data for backend");
-       }
-       
-       return res.data;
+    const res = await this.request("GET", `/api/templates/${id}`);
+    if (res.status != 200) {
+      throw new Error("invalid data for backend");
+    }
+    console.log(res)
+    const headers = res.data?.placeholder;
+    const data = res.data?.finaldata;
+    const url = res.data?.url
+    return [data,headers,url]
+  }
+  async downloadTemplate(url: string) {
+      const res = await this.request('GET',url)
+      return res;
   }
 }

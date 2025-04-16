@@ -4,15 +4,17 @@ import { Button, Modal, Form, Upload, message } from "antd";
 import { UploadOutlined } from "@ant-design/icons";
 import readExcelFile from "../service/ReadFile";
 import CustomTable from "../components/CustomTable";
-import { useParams } from "react-router";
+import { Link, useParams } from "react-router";
 import { requestClient } from "../store";
 
 const RequestPage: React.FC = () => {
   const templateId: string | any = useParams()?.id;
   const [ModalDrawer, setModalDrawer] = useState(false);
+  const [form] = Form.useForm()
   const [loading, setLoading] = useState(false);
   const [ExcelData, setExcelData] = useState<any[]>([]);
   const [columns, setColumns] = useState<any[]>([]);
+  const [url,setUrl] = useState<string>('');
   const [, setCurrentPage] = useState<number>(1);
 
   const uploadFile = async (info: any) => {
@@ -21,16 +23,12 @@ const RequestPage: React.FC = () => {
       if (info?.document?.fileList?.length == 0)
         throw new Error("no file uploaded");
       console.log(info.document.file);
-      const [data, headers] = await readExcelFile(info.document.file);
+      const data = await readExcelFile(info.document.file);
       console.table(data);
       await requestClient.sendExcelData({ templateId, data });
-      const temp = Object.keys(data[0]).map((key) => ({
-        title: key,
-        dataIndex: key,
-        key: key,
-      }));
-      setColumns(temp);
-      setExcelData((prev) => [...prev, ExcelData]);
+      setExcelData((prev) => [...prev, ...data]);
+      setModalDrawer(false);
+        form.resetFields()
     } catch (error: any) {
       console.log(error);
       message.error(error.message);
@@ -41,18 +39,46 @@ const RequestPage: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const data = await requestClient.getDataExcel(templateId);
-      const temp = Object.keys(data[0]).map((key) => ({
+      const [data,headers,url] = await requestClient.getDataExcel(templateId);
+      console.log(headers,data)
+      const temp:any = headers.map((key:Object) => ({
         title: key,
         dataIndex: key,
         key: key,
       }));
+      temp.push(
+        {
+          title: "sign Date",
+          dataIndex: "signDate",
+          key: "signDate",
+        },
+        {
+          title: "Request Status",
+          dataIndex: "signStatus",
+          key: "requestStatus",
+          render: (status: number) => {
+            if (status == 3) return <>Delegated</>;
+            else if (status == 0) return <>Unsigned</>;
+            else if (status == 5) return <>Signed</>;
+          },
+        }
+      );
       setColumns(temp);
-      setExcelData(data);
+      setUrl(url);
+      if(data)
+      setExcelData((data));
     } catch (error: any) {
       message.error(error.message);
     }
   };
+  const downloadTemplate = async ()=>{
+    try{
+        const res = await requestClient.downloadTemplate(url)
+        console.log(res)
+    }catch(err:any){
+      message.error(err.message)
+    }
+  }
   useEffect(()=>{
 		fetchData()
   },[])
@@ -63,6 +89,9 @@ const RequestPage: React.FC = () => {
         <>
           <Button type="primary" onClick={() => setModalDrawer(true)}>
             Upload File
+          </Button>
+          <Button type="primary">
+            <Link to={`http://localhost:3000/${url}`}>Download File</Link>
           </Button>
         </>
       }
@@ -84,7 +113,7 @@ const RequestPage: React.FC = () => {
         open={ModalDrawer}
         onCancel={() => setModalDrawer(false)}
       >
-        <Form onFinish={uploadFile}>
+        <Form onFinish={uploadFile} form={form}>
           <Form.Item
             label="Upload .csv,.xlsx,.xls File"
             name="document"
@@ -95,6 +124,7 @@ const RequestPage: React.FC = () => {
               name="file"
               accept={".csv,.xlsx,.xls"}
               listType="text"
+              maxCount={1}
             >
               <Button icon={<UploadOutlined />}>Click to Upload</Button>
             </Upload>

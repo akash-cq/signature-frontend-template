@@ -9,22 +9,19 @@ const readExcelFile = async (file: File) => {
     defval: "",
   });
 
-  //console.log(e.target.files[0]);
-//   console.log(workbook);
-//   console.log(jsonData, jsonData.length);
   if (jsonData.length == 0) throw new Error("file is empty");
   if (jsonData.length == 1) throw new Error("file is empty only have headers");
   const jsonDataa = XLSX.utils.sheet_to_json(worksheet);
   const headers: any = jsonData[0];
-  jsonDataa.forEach((obj:any)=>{
+  jsonDataa.forEach((obj: any) => {
     const keys = Object.keys(obj);
-  const missingKeys = headers.filter((header:any) => !keys.includes(header));
-    console.log(headers)
-    if (missingKeys.length>0) {
+    const missingKeys = headers.filter((header: any) => !keys.includes(header));
+    console.log(headers);
+    if (missingKeys.length > 0) {
       console.log(obj);
       throw new Error(`Excel Entry is not completed at row ${obj?.__rowNum__}`);
     }
-  })
-  return [jsonDataa,headers];
+  });
+  return jsonDataa;
 };
 export default readExcelFile;
