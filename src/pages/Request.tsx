@@ -1,7 +1,22 @@
 import React, { useEffect, useState } from "react";
 import MainAreaLayout from "../components/main-layout/main-layout";
-import { Button, Modal, Form, Upload, message } from "antd";
-import { UploadOutlined } from "@ant-design/icons";
+import {
+  Button,
+  Modal,
+  Form,
+  Upload,
+  message,
+  Alert,
+  Flex,
+  Input,
+  Popconfirm,
+  Tooltip,
+} from "antd";
+import {
+  CloseCircleOutlined,
+  EyeOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
 import readExcelFile from "../service/ReadFile";
 import CustomTable from "../components/CustomTable";
 import { Link, useParams } from "react-router";
@@ -14,20 +29,35 @@ interface metaData {
   status: number;
   signStatus: number;
 }
+interface ExcelData {
+  data: Record<any, any>;
+  id?: string;
+}
 const RequestPage: React.FC = () => {
   const session = useAppStore().session?.userId;
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
   const templateId: string | any = useParams()?.id;
   const [metadata, setMetaData] = useState<metaData | null>(null);
-  const [ModalDrawer, setModalDrawer] = useState(false);
+  const [rejectModal, setReject] = useState<boolean>(false);
+  const [ModalDrawer, setModalDrawer] = useState<boolean>(false);
   const [form] = Form.useForm();
-  const [loading, setLoading] = useState(false);
-  const [ExcelData, setExcelData] = useState<any[]>([]);
-  const [columns, setColumns] = useState<any[]>([]);
-  const [url, setUrl] = useState<string>("");
+  const [currentReeject, setCurrentReject] = useState<ExcelData | null>(null);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [ExcelData, setExcelData] = useState<ExcelData[]>([]);
+  const [columns, setColumns] = useState<Object[]>([]);
   const [, setCurrentPage] = useState<number>(1);
-
+  const updatingData = (d: any) => {
+    const finalCalculateData:ExcelData[] = d.data.map((obj: any) => {
+      obj.data.id = obj.id;
+      obj.data.signStatus = obj.signStatus;
+      if (obj?.rejectionReason) obj.data.rejectionReason = obj.rejectionReason;
+      return obj.data;
+    });
+    console.log(d);
+    setExcelData(finalCalculateData);
+    return;
+  };
   const uploadFile = async (info: any) => {
     try {
       setLoading(true);
@@ -36,29 +66,31 @@ const RequestPage: React.FC = () => {
       console.log(info.document.file);
       const data = await readExcelFile(info.document.file);
       console.table(data);
-      await requestClient.sendExcelData({ templateId, data });
-      const finalCalculateData = data.map((obj: any) => {
-        obj.signStatus = signStatus.unsigned;
-        return obj;
-      });
-      console.log(finalCalculateData);
-      setExcelData((prev) => [...prev, ...finalCalculateData]);
+      const d = await requestClient.sendExcelData({ templateId, data });
+      updatingData(d);
       setModalDrawer(false);
-      form.resetFields();
+      message.success("Succesfuly Uploaded The Excel File");
     } catch (error: any) {
-      console.log(error);
       message.error(error.message);
     } finally {
       setLoading(false);
+      form.resetFields();
     }
   };
-
+  const handleDelete = async (data: ExcelData) => {
+    try {
+      await requestClient.deleteExcelEntry(data, templateId);
+      setExcelData((prev) => prev.filter((obj: any) => data?.id != obj?.id));
+      message.success("Succesfuly Deleted");
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
   const fetchData = async () => {
     try {
       const [data, headers, url, metadata] =
         await requestClient.getDataExcel(templateId);
-      console.log(headers, data);
-      const temp: any = headers.map((key: Object) => ({
+      const temp: Object[] = headers.map((key: Object) => ({
         title: key,
         dataIndex: key,
         key: key,
@@ -68,6 +100,20 @@ const RequestPage: React.FC = () => {
           title: "sign Date",
           dataIndex: "signDate",
           key: "signDate",
+        },
+        {
+          title: "Reject Reason",
+          dataIndex: "rejectionReason",
+          key: "rejectionReason",
+          render: (msg: string) => {
+            if (msg)
+              return (
+                <Tooltip title={msg} placement="top">
+                  <CloseCircleOutlined />
+                </Tooltip>
+              );
+            else return <></>;
+          },
         },
         {
           title: "Request Status",
@@ -83,22 +129,68 @@ const RequestPage: React.FC = () => {
           title: "Action",
           dataIndex: "signStatus",
           key: "Action",
-          render: (status: number) => {
-            if (status == 3) return <Button>Preview</Button>;
-            else if (status == 0) return <Button danger>Delete</Button>;
-            else if (status == 5) return <Button type="primary">Download</Button>;
+          render: (status: number, record: ExcelData) => {
+            if (status == 3)
+              return <Button icon={<EyeOutlined />}>Preview</Button>;
+            else if (status == 0)
+              return (
+                <Flex justify="spce-around" gap={10}>
+                  <Link
+                    to={`${backendUrl}/templates/${templateId}/preview/${record?.id}`}
+                    target="_blank"
+                  >
+                    <Button icon={<EyeOutlined />}></Button>
+                  </Link>
+                  {metadata.assignedTo != session && (
+                    <Button danger onClick={() => handleDelete(record)}>
+                      Delete
+                    </Button>
+                  )}
+                  {metadata.assignedTo === session && (
+                    <Button
+                      danger
+                      onClick={() => {
+                        setCurrentReject(record);
+                        setReject(true);
+                      }}
+                    >
+                      Reject
+                    </Button>
+                  )}
+                </Flex>
+              );
+            else if (status == 5)
+              return <Button type="primary">Download</Button>;
           },
         }
       );
+      console.log(data);
       setColumns(temp);
-      setUrl(url);
       setMetaData(metadata);
+      console.log(data);
       if (data) setExcelData(data);
     } catch (error: any) {
       message.error(error.message);
     }
   };
+  const handleReject = async (info: any) => {
+    try {
+      const payload = {
+        ...info,
+        Detail: currentReeject,
+        templateId: templateId,
+      };
+      const res = await requestClient.rejectDoc(payload);
+      console.log(res);
+      setExcelData(res.finaldata);
+      setCurrentReject(null);
+      setReject(false);
 
+      form.resetFields();
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
   useEffect(() => {
     fetchData();
   }, []);
@@ -124,7 +216,9 @@ const RequestPage: React.FC = () => {
             </Button>
           )}
           <Button type="primary">
-            <Link to={`${backendUrl}/${url}`}>Download Template</Link>
+            <Link to={`${backendUrl}/api/templates/download/${metadata?.id}`}>
+              Download Template
+            </Link>
           </Button>
         </>
       }
@@ -165,6 +259,33 @@ const RequestPage: React.FC = () => {
           <Form.Item>
             <Button type="primary" htmlType="submit">
               Submit
+            </Button>
+          </Form.Item>
+          <Alert
+            message="Note"
+            description="Excel File must have all needed placeholders related with this request's template otherwise download the excel file for Pre-Built headers"
+            type="info"
+            showIcon
+          />
+        </Form>
+      </Modal>
+      <Modal
+        title="Reject Document"
+        open={rejectModal}
+        footer={null}
+        onCancel={() => setReject(false)}
+      >
+        <Form onFinish={handleReject} form={form}>
+          <Form.Item
+            label="Reason For Rejection"
+            name="rejection"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="type the reason..." />
+          </Form.Item>
+          <Form.Item>
+            <Button htmlType="submit" danger>
+              Reject
             </Button>
           </Form.Item>
         </Form>

@@ -62,7 +62,7 @@ export class RequestClient extends Client {
     const res = await this.request("PATCH", `/api/templates/${templateId}`, {
       data: data,
     });
-    return;
+    return res.data;
   }
   async getDataExcel(id: string) {
     const res = await this.request("GET", `/api/templates/${id}`);
@@ -73,7 +73,7 @@ export class RequestClient extends Client {
     const headers = res.data?.placeholder;
     const data = res.data?.finaldata;
     const url = res.data?.url;
-    const metadata = res.data?.metadata
+    const metadata = res.data?.metadata;
     return [data, headers, url, metadata];
   }
   async deleteRequest(id: string) {
@@ -85,5 +85,24 @@ export class RequestClient extends Client {
       data: requests,
     });
     return res;
+  }
+  async deleteExcelEntry(data: any, templateId:string) {
+    await this.request(
+      "DELETE",
+      `/api/templates/entry/${templateId}/${data.id}/`
+    );
+    return;
+  }
+  async rejectDoc(data:object) {
+    const res = await this.request('POST','/api/templates/reject',{
+      data:data
+    })
+    return res.data
+  }
+  async SignAll(data:any){
+    const res = await this.request('POST','/api/signatures',{
+      data:data
+    })
+    return;
   }
 }

@@ -1,4 +1,5 @@
 import {
+  Alert,
   Button,
   Flex,
   Form,
@@ -7,6 +8,7 @@ import {
   Modal,
   Popconfirm,
   Select,
+  Tag,
   Upload,
 } from "antd";
 import MainAreaLayout from "../components/main-layout/main-layout";
@@ -14,9 +16,10 @@ import { useEffect, useState } from "react";
 import CustomTable from "../components/CustomTable";
 import { AxiosError } from "axios";
 import { requestClient, useAppStore } from "../store";
-import { UploadOutlined } from "@ant-design/icons";
+import { ClockCircleOutlined, UploadOutlined } from "@ant-design/icons";
 import { Link, useNavigate } from "react-router";
 import { signStatus } from "../libs/constants";
+import Search from "antd/es/transfer/search";
 interface officers {
   id: String;
   name: String;
@@ -30,24 +33,24 @@ interface requests {
   url: string;
   signStatus: number;
   createdBy: string;
-  DocCount:any
+  DocCount: any;
 }
 const Requests: React.FC = () => {
   const navigate = useNavigate();
   const session = useAppStore().session?.userId;
-const backendUrl = import.meta.env.VITE_BACKEND_URL;
-
+  const backendUrl = import.meta.env.VITE_BACKEND_URL;
+  const [otpModal, setOtpModal] = useState<boolean>(false);
   const [data, setdata] = useState<requests[]>([]);
   const [loading, setLoading] = useState(false);
   const [, setCurrentPage] = useState<number>(1);
   const [selectedOfficer, setSelectedOfficer] = useState<string>("");
   const [officers, setOfficers] = useState<officers[]>([]);
   const [Request, setRequest] = useState<requests | null>(null);
-  const [officerDrawer, setOfficerDrawer] = useState(false);
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const [officerDrawer, setOfficerDrawer] = useState<boolean>(false);
+  const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [form] = Form.useForm();
   const [OfficerForm] = Form.useForm();
-  const [template, setTemplate] = useState<File | any>(null);
+
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -55,46 +58,34 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       console.log(requestsData);
       setdata(requestsData);
       const officersFromServer = await requestClient.getofficers();
-      console.log(officersFromServer);
-      const arr: officers[] = officersFromServer.map((element) => ({
+      const arr: any = officersFromServer.map((element) => ({
         label: element.name,
         value: element.id,
       }));
       setOfficers(arr);
-    } catch (error) {
-      if (error instanceof AxiosError) {
-        message.error(error.response?.data?.error);
-        return;
-      }
-      if (error instanceof Error) {
-        message.error(error.message);
-        return;
-      }
-      message.error("Failed to fetch courts");
+    } catch (error: any) {
+      if (error.AxiosError.status != 404) message.error("Failed to fetch data");
     } finally {
       setLoading(false);
     }
   };
+
   const handlerequest = () => {
     form.resetFields();
     setIsDrawerOpen(true);
   };
+
   const handleOfficerChange = (value: string) => {
     console.log(value);
     setSelectedOfficer(value);
   };
-  const fileSelect = (info: any) => {
-    if (info.fileList.length == 0) {
-      alert("select file");
-      return;
-    }
-    console.log(info);
-    setTemplate(info.fileList[0]);
-  };
+
   const onSubmitForm = async () => {
     try {
       const values = await form.validateFields();
       const { name, Description, template } = values;
+      if (name.trim() == "" || Description.trim() == "")
+        throw new Error("name and Desription is empty");
       console.log(name, Description, template, values);
       const payload = {
         name: name,
@@ -105,32 +96,29 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       setdata((prev) => [...prev, response]);
       setIsDrawerOpen(false);
       form.resetFields();
-    } catch (error) {
-      message.error("failed to upload");
+      message.success("Succesfuly Request is Created");
+    } catch (error: any) {
+      message.error(error.message ?? "failed to upload");
     }
   };
   const sendSignHandle = async () => {
     try {
-      console.log(selectedOfficer);
-      try {
-        const res = await requestClient.sendToOfficer({
-          selectedOfficer,
-          Request,
-        });
-        console.log(res);
-        setOfficerDrawer(false);
-        OfficerForm.resetFields();
-        setdata((prev) =>
-          prev.map((obj) => {
-            if (obj.id === Request?.id) return { ...obj, signStatus: 1 };
-            return obj;
-          })
-        );
-      } catch (err: any) {
-        message.error(err.message);
-      }
-    } catch (error) {
-      message.error("network error");
+      const res = await requestClient.sendToOfficer({
+        selectedOfficer,
+        Request,
+      });
+      console.log(res);
+      setOfficerDrawer(false);
+      OfficerForm.resetFields();
+      setdata((prev) =>
+        prev.map((obj) => {
+          if (obj.id === Request?.id) return { ...obj, signStatus: 1 };
+          return obj;
+        })
+      );
+      message.success("Succesfuly Send For Sign");
+    } catch (err: any) {
+      message.error(err.message);
     }
   };
   const deletRequest = async (id: string) => {
@@ -142,8 +130,20 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       message.error(error.message);
     }
   };
+  const handleSearch = (e: any) => {
+    console.log(e.target.value);
+  };
+  const handleSign = async (request: requests) => {
+    try {
+      const res = await requestClient.SignAll(request);
+      setOtpModal(true);
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
   useEffect(() => {
-    fetchData();
+    console.log(data, "ehvhedcvxv");
+    if (data.length == 0) fetchData();
   }, []);
   const columns = [
     {
@@ -153,7 +153,12 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       render: (text: string, record: requests) => {
         return (
           <Button type="link">
-            <Link to={`${backendUrl}/${record.url}`}>{text}</Link>
+            <Link
+              to={`${backendUrl}/templates/preview/docx/${record.id}`}
+              target="_blank"
+            >
+              {text}
+            </Link>
           </Button>
         );
       },
@@ -177,9 +182,12 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       title: "Number Of Rejected Document",
       dataIndex: "rejectCount",
       key: "rejectCount",
-      render: (text: number) => {
+      render: (text: number, record: requests) => {
         return (
-          <Button type="link" onClick={() => alert(text)}>
+          <Button
+            type="link"
+            onClick={() => navigate(`/dashboard/request/${record.id}`)}
+          >
             {text}
           </Button>
         );
@@ -194,17 +202,29 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       title: "Request Status",
       dataIndex: "signStatus",
       key: "rqststatus",
-      render: (text: number) => {
-        if (text == 0) {
-          return <>Draft</>;
-        } else if (text == 1) {
-          return <>Waiting For Sign</>;
-        } else if (text == 3) {
-          return <>Delegated</>;
-        } else if (text == 5) {
-          return <>Signed</>;
-        } else if (text == 6) {
-          return <>Ready For Dispatched</>;
+      render: (text: number, record: requests) => {
+        if (record.createdBy === session) {
+          if (text == 0) {
+            return <Tag>Draft</Tag>;
+          } else if (text == 1) {
+            return <Tag icon={<ClockCircleOutlined />}>Waiting For Sign</Tag>;
+          } else if (text == 3) {
+            return <Tag>Delegated</Tag>;
+          } else if (text == 5) {
+            return <Tag>Signed</Tag>;
+          } else if (text == 6) {
+            return <Tag>Ready For Dispatched</Tag>;
+          }
+        } else {
+          if (text == 1) {
+            return <Tag icon={<ClockCircleOutlined />}>Pending</Tag>;
+          } else if (text == 3) {
+            return <Tag>Delegated</Tag>;
+          } else if (text == 5) {
+            return <Tag>Signed</Tag>;
+          } else if (text == 6) {
+            return <Tag>Ready For Dispatched</Tag>;
+          }
         }
       },
     },
@@ -214,15 +234,14 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
       key: "action",
       render: (action: number, request: requests) => {
         if (request.createdBy === session) {
-          if (action == signStatus.unsigned && request.createdBy === session ) {
+          if (action == signStatus.unsigned && request.createdBy === session) {
             return (
-              <Flex justify="space-around" gap={5}>
+              <Flex justify="space-around" gap={5} vertical>
                 <Button
                   onClick={() => {
-                    if(request.DocCount!=0)
-                    setOfficerDrawer(true), setRequest(request);
-                  else
-                    message.error("no document is uploaded")
+                    if (request.DocCount != 0)
+                      setOfficerDrawer(true), setRequest(request);
+                    else message.error("no document is uploaded");
                   }}
                 >
                   Send
@@ -239,11 +258,16 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
           } else if (action == signStatus.readyForSign) {
             return <Button>Clone</Button>;
           }
-        }else{
-          if(action==signStatus.readyForSign){
+        } else {
+          if (action == signStatus.readyForSign) {
             return (
               <Flex justify="space-around" gap={6}>
-                <Button>Sign All</Button>
+                <Popconfirm
+                  title="Are you sure to sign all?"
+                  onConfirm={() => handleSign(request)}
+                >
+                  <Button>Sign All</Button>
+                </Popconfirm>
                 <Button>Reject</Button>
                 <Button>Delegate</Button>
               </Flex>
@@ -258,9 +282,15 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
     <MainAreaLayout
       title="Request Management"
       extra={
-        <Button type="primary" onClick={handlerequest}>
-          Add request
-        </Button>
+        <Flex justify="space-evenly" gap={10}>
+          <Search
+            placeholder="Search a request.."
+            onChange={handleSearch}
+          ></Search>
+          <Button type="primary" onClick={handlerequest}>
+            Add request
+          </Button>
+        </Flex>
       }
     >
       <CustomTable
@@ -305,7 +335,6 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
               name="file"
               accept=".docx"
               listType="text"
-              onChange={fileSelect}
               maxCount={1}
             >
               <Button icon={<UploadOutlined />}>Click to Upload</Button>
@@ -316,6 +345,12 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
               Submit
             </Button>
           </Form.Item>
+          <Alert
+            message="Note"
+            description="Your template file must have Signature or QR_Code Placeholder otherwise file will be rejected. or placeholder must be in curly braces {}"
+            type="info"
+            showIcon
+          />
         </Form>
       </Modal>
 
@@ -335,6 +370,18 @@ const backendUrl = import.meta.env.VITE_BACKEND_URL;
             <Button type="primary" htmlType="submit">
               Submit
             </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+      <Modal
+        title="OTP Verification"
+        open={otpModal}
+        onCancel={() => setOtpModal(false)}
+        footer={null}
+      >
+        <Form>
+          <Form.Item>
+            <Input.OTP variant="filled"></Input.OTP>
           </Form.Item>
         </Form>
       </Modal>
