@@ -3,26 +3,38 @@ import {
   Button,
   Flex,
   Form,
+  Image,
   Input,
   message,
   Modal,
   Popconfirm,
+  Radio,
   Select,
   Tag,
+  Tooltip,
   Upload,
 } from "antd";
 import MainAreaLayout from "../components/main-layout/main-layout";
 import { useEffect, useState } from "react";
 import CustomTable from "../components/CustomTable";
-import { AxiosError } from "axios";
-import { requestClient, useAppStore } from "../store";
-import { ClockCircleOutlined, UploadOutlined } from "@ant-design/icons";
+import { requestClient, signatureClient, useAppStore } from "../store";
+import {
+  ClockCircleOutlined,
+  ProductOutlined,
+  SyncOutlined,
+  UploadOutlined,
+} from "@ant-design/icons";
 import { Link, useNavigate } from "react-router";
 import { signStatus } from "../libs/constants";
 import Search from "antd/es/transfer/search";
+
 interface officers {
   id: String;
   name: String;
+}
+interface Images {
+  id: string;
+  url: string;
 }
 interface requests {
   id: string;
@@ -34,20 +46,30 @@ interface requests {
   signStatus: number;
   createdBy: string;
   DocCount: any;
+  delegationReason?: string;
+  rejectCount: number;
+  delegatedTo: string;
 }
 const Requests: React.FC = () => {
   const navigate = useNavigate();
   const session = useAppStore().session?.userId;
+
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [otpModal, setOtpModal] = useState<boolean>(false);
-  const [data, setdata] = useState<requests[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [, setCurrentPage] = useState<number>(1);
-  const [selectedOfficer, setSelectedOfficer] = useState<string>("");
-  const [officers, setOfficers] = useState<officers[]>([]);
-  const [Request, setRequest] = useState<requests | null>(null);
-  const [officerDrawer, setOfficerDrawer] = useState<boolean>(false);
+  const [loading, setLoading] = useState<boolean>(false);
+  const [signModal, setSignModal] = useState<boolean>(false);
+  const [delegatedModal, setDelegatedModal] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
+  const [officerDrawer, setOfficerDrawer] = useState<boolean>(false);
+
+  const [data, setdata] = useState<requests[]>([]);
+  const [officers, setOfficers] = useState<officers[]>([]);
+  const [signature, setSignatureData] = useState<Images[]>([]);
+
+  const [CurrentImage, setCurrentImage] = useState<Images | null>(null);
+  const [Request, setRequest] = useState<requests | null>(null);
+  const [selectedOfficer, setSelectedOfficer] = useState<string>("");
+  const [, setCurrentPage] = useState<number>(1);
   const [form] = Form.useForm();
   const [OfficerForm] = Form.useForm();
 
@@ -101,6 +123,7 @@ const Requests: React.FC = () => {
       message.error(error.message ?? "failed to upload");
     }
   };
+
   const sendSignHandle = async () => {
     try {
       const res = await requestClient.sendToOfficer({
@@ -121,6 +144,7 @@ const Requests: React.FC = () => {
       message.error(err.message);
     }
   };
+
   const deletRequest = async (id: string) => {
     try {
       await requestClient.deleteRequest(id);
@@ -133,10 +157,69 @@ const Requests: React.FC = () => {
   const handleSearch = (e: any) => {
     console.log(e.target.value);
   };
-  const handleSign = async (request: requests) => {
+  const handleClone = async (data: requests) => {
     try {
-      const res = await requestClient.SignAll(request);
-      setOtpModal(true);
+      const res = await requestClient.sendForClone(data);
+      setdata((prev) => [...prev, res]);
+      message.success("Succesfuly Request is Cloned");
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
+  const handleOtpVerify = async (info: any) => {
+    try {
+      const res = await signatureClient.verifyOtp(info);
+      console.log(info);
+      form.resetFields();
+      setOtpModal(false);
+      getSign();
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
+  const handleDelegated = async (info: any) => {
+    try {
+      const res = await requestClient.delegated({ ...info, ...Request });
+      setDelegatedModal(false);
+      form.resetFields();
+      setdata((prev) =>
+        prev.map((obj) => {
+          if (obj.id == Request?.id) {
+            return res;
+          }
+          return obj;
+        })
+      );
+      setRequest(null);
+      message.success("sucessfuly delegated");
+    } catch (error: any) {
+      message.error(error.message);
+    }
+  };
+  const getSign = async () => {
+    const res = await signatureClient.getSignatures();
+    setSignatureData(res);
+    setSignModal(true);
+  };
+  const getOtp = async (data: requests) => {
+    setRequest(data);
+    const res = await signatureClient.getOtp(data);
+    setOtpModal(true);
+  };
+  const handleSendSign = (e: any) => {
+    console.log("Select", e.target.value);
+    setCurrentImage(e.target.value);
+  };
+
+  const selectAndSign = async () => {
+    try {
+      setSignModal(false);
+      const payload = {
+        templateId: Request?.id,
+        SignatureId: CurrentImage?.id,
+      };
+      const res = await signatureClient.StartSigning(payload);
+      message.success("start signing process");
     } catch (error: any) {
       message.error(error.message);
     }
@@ -145,6 +228,10 @@ const Requests: React.FC = () => {
     console.log(data, "ehvhedcvxv");
     if (data.length == 0) fetchData();
   }, []);
+
+  {
+    /** Columns Defination */
+  }
   const columns = [
     {
       title: "Request Name",
@@ -162,6 +249,11 @@ const Requests: React.FC = () => {
           </Button>
         );
       },
+    },
+    {
+      title: "Description",
+      dataIndex: "description",
+      key: "description",
     },
     {
       title: "Number Of Document",
@@ -197,6 +289,10 @@ const Requests: React.FC = () => {
       title: "Created At",
       dataIndex: "createdAt",
       key: "createdat",
+      render: (data: any) => {
+        const date = new Date(data);
+        return <>{date.toUTCString()}</>;
+      },
     },
     {
       title: "Request Status",
@@ -207,24 +303,54 @@ const Requests: React.FC = () => {
           if (text == 0) {
             return <Tag>Draft</Tag>;
           } else if (text == 1) {
-            return <Tag icon={<ClockCircleOutlined />}>Waiting For Sign</Tag>;
+            return (
+              <Tag color="orange" icon={<ClockCircleOutlined />}>
+                Waiting For Sign
+              </Tag>
+            );
           } else if (text == 3) {
-            return <Tag>Delegated</Tag>;
+            return (
+              <Tooltip title={record.delegationReason} placement="top">
+                <Tag color="cyan">Delegated</Tag>
+              </Tooltip>
+            );
           } else if (text == 5) {
-            return <Tag>Signed</Tag>;
+            return <Tag color="success">Signed</Tag>;
           } else if (text == 6) {
             return <Tag>Ready For Dispatched</Tag>;
-          }
+          } else if (text == signStatus.rejected)
+            return <Tag color="error">Reject</Tag>;
+          else if (text == signStatus.inProcess)
+            return (
+              <Tag icon={<SyncOutlined spin />} color="processing">
+                Processing
+              </Tag>
+            );
         } else {
           if (text == 1) {
-            return <Tag icon={<ClockCircleOutlined />}>Pending</Tag>;
+            return (
+              <Tag color="magenta" icon={<ClockCircleOutlined />}>
+                Pending
+              </Tag>
+            );
           } else if (text == 3) {
-            return <Tag>Delegated</Tag>;
+            return (
+              <Tooltip title={record.delegationReason} placement="top">
+                <Tag color="cyan">Delegated</Tag>
+              </Tooltip>
+            );
           } else if (text == 5) {
-            return <Tag>Signed</Tag>;
+            return <Tag color="success">Signed</Tag>;
           } else if (text == 6) {
             return <Tag>Ready For Dispatched</Tag>;
-          }
+          } else if (text == signStatus.rejected)
+            return <Tag color="error">Reject</Tag>;
+          else if (text == signStatus.inProcess)
+            return (
+              <Tag icon={<SyncOutlined spin />} color="processing">
+                Processing
+              </Tag>
+            );
         }
       },
     },
@@ -233,8 +359,8 @@ const Requests: React.FC = () => {
       dataIndex: "signStatus",
       key: "action",
       render: (action: number, request: requests) => {
-        if (request.createdBy === session) {
-          if (action == signStatus.unsigned && request.createdBy === session) {
+        if (request.createdBy === session || request?.delegatedTo === session) {
+          if (action == signStatus.unsigned) {
             return (
               <Flex justify="space-around" gap={5} vertical>
                 <Button
@@ -252,26 +378,46 @@ const Requests: React.FC = () => {
                 >
                   <Button danger>Delete</Button>
                 </Popconfirm>
-                <Button>Clone</Button>
+                <Button onClick={() => handleClone(request)}>Clone</Button>
               </Flex>
             );
           } else if (action == signStatus.readyForSign) {
-            return <Button>Clone</Button>;
+            return <Button onClick={() => handleClone(request)}>Clone</Button>;
+          } else if (action === signStatus.delegated) {
+            return (
+              <Popconfirm
+                title="Are you sure to sign all?"
+                onConfirm={() => getOtp(request)}
+              >
+                <Button>Sign All</Button>
+              </Popconfirm>
+            );
+          } else {
+            <Button onClick={() => handleClone(request)}>Clone</Button>;
           }
         } else {
           if (action == signStatus.readyForSign) {
             return (
-              <Flex justify="space-around" gap={6}>
+              <Flex justify="space-around" gap={6} vertical>
                 <Popconfirm
                   title="Are you sure to sign all?"
-                  onConfirm={() => handleSign(request)}
+                  onConfirm={() => getOtp(request)}
                 >
                   <Button>Sign All</Button>
                 </Popconfirm>
                 <Button>Reject</Button>
-                <Button>Delegate</Button>
+                <Button
+                  onClick={() => {
+                    setRequest(request);
+                    setDelegatedModal(true);
+                  }}
+                >
+                  Delegate
+                </Button>
               </Flex>
             );
+          } else {
+            <Button onClick={() => handleClone(request)}>Clone</Button>;
           }
         }
       },
@@ -279,6 +425,7 @@ const Requests: React.FC = () => {
   ];
 
   return (
+    /** main area layout */
     <MainAreaLayout
       title="Request Management"
       extra={
@@ -293,9 +440,10 @@ const Requests: React.FC = () => {
         </Flex>
       }
     >
+      {/** table layout */}
       <CustomTable
         serialNumberConfig={{
-          name: "",
+          name: "Sr",
           show: true,
         }}
         columns={columns}
@@ -303,6 +451,9 @@ const Requests: React.FC = () => {
         loading={loading}
         onPageChange={(page) => setCurrentPage(page)}
       />
+
+      {/** new Request Modal */}
+
       <Modal
         title={"Make new request"}
         centered
@@ -354,7 +505,8 @@ const Requests: React.FC = () => {
         </Form>
       </Modal>
 
-      {/** select officer modal */}
+      {/** select officer Modal */}
+
       <Modal
         title={"Select Officer"}
         centered
@@ -373,15 +525,85 @@ const Requests: React.FC = () => {
           </Form.Item>
         </Form>
       </Modal>
+
+      {/** otp modal */}
+
       <Modal
         title="OTP Verification"
         open={otpModal}
         onCancel={() => setOtpModal(false)}
         footer={null}
       >
-        <Form>
+        <Form onFinish={handleOtpVerify} form={form}>
+          <Form.Item label="Enter OTP" name="otp" rules={[{ required: true }]}>
+            <Input.OTP length={4}></Input.OTP>
+          </Form.Item>
           <Form.Item>
-            <Input.OTP variant="filled"></Input.OTP>
+            <Button htmlType="submit" type="primary">
+              Verify
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/** Delegat Modal  */}
+      <Modal
+        title="Delegate Document"
+        open={delegatedModal}
+        footer={null}
+        onCancel={() => setDelegatedModal(false)}
+      >
+        <Form form={form} onFinish={handleDelegated}>
+          <Form.Item
+            label="Reason For Delegation"
+            name="delegationReason"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="type the reason..." />
+          </Form.Item>
+          <Form.Item>
+            <Button htmlType="submit" type="primary">
+              Delegate
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      {/** Signature Modal */}
+      <Modal
+        title="Select Signature"
+        open={signModal}
+        footer={null}
+        onCancel={() => setSignModal(false)}
+      >
+        <Form onFinish={selectAndSign}>
+          {CurrentImage && (
+            <div style={{ border: "1px solid grey", display: "inline-block" }}>
+              <Image src={`${backendUrl}/${CurrentImage?.url}`} width={100} />
+            </div>
+          )}
+          <Form.Item>
+            <Radio.Group
+              value={CurrentImage}
+              onChange={handleSendSign}
+              options={signature.map((obj: Images) => ({
+                value: obj,
+                label: (
+                  <div style={{ textAlign: "center" }}>
+                    <Image
+                      src={`${backendUrl}/${obj.url}`}
+                      preview={false}
+                      width={100}
+                    />
+                  </div>
+                ),
+              }))}
+            />
+          </Form.Item>
+          <Form.Item>
+            <Button type="primary" htmlType="submit">
+              Sign
+            </Button>
           </Form.Item>
         </Form>
       </Modal>

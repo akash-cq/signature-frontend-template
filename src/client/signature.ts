@@ -25,10 +25,32 @@ class SignatureClient extends Client {
     const res = await this.request("GET", "/api/signatures");
     return res.data;
   }
-  async deleteSignatures(data:any) {
+  async deleteSignatures(data: any) {
     const res = await this.request("DELETE", `/signatures/${data.id}`);
     return res.data;
   }
-  
+  async getOtp(data: Object) {
+    const res = await this.request("POST", "/api/signatures/otp", {
+      data: data,
+    });
+    return res;
+  }
+  async verifyOtp(data: Object) {
+    const res = await this.request("POST", "/api/signatures/verify", {
+      data: data,
+    });
+    return res;
+  }
+  async SignAll(data: any) {
+    const res = await this.request("POST", "/api/signatures", {
+      data: data,
+    });
+    return;
+  }
+    async StartSigning(data:any){
+      const res = await this.request("POST", "/api/signatures/Signed",{
+        data:data
+      });
+    }
 }
 export default SignatureClient;

@@ -86,23 +86,32 @@ export class RequestClient extends Client {
     });
     return res;
   }
-  async deleteExcelEntry(data: any, templateId:string) {
+  async deleteExcelEntry(data: any, templateId: string) {
     await this.request(
       "DELETE",
       `/api/templates/entry/${templateId}/${data.id}/`
     );
     return;
   }
-  async rejectDoc(data:object) {
-    const res = await this.request('POST','/api/templates/reject',{
-      data:data
-    })
-    return res.data
+  async rejectDoc(data: object) {
+    const res = await this.request("POST", "/api/templates/reject", {
+      data: data,
+    });
+    return res.data;
   }
-  async SignAll(data:any){
-    const res = await this.request('POST','/api/signatures',{
+  async sendForClone(data: Object) {
+    const res = await this.request('POST',"/api/templates/clone",{
       data:data
     })
-    return;
+    const dataObj = res.data.data;
+    dataObj.DocCount = 0;
+    dataObj.rejectCount = 0;
+    return dataObj;
+  }
+  async delegated(data:Object){
+    const res = await this.request("POST", "/api/templates/delegated",{
+      data
+    });
+    return res.data;
   }
 }

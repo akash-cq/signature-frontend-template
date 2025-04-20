@@ -9,12 +9,12 @@ import {
   Alert,
   Flex,
   Input,
-  Popconfirm,
   Tooltip,
+  Tag,
 } from "antd";
 import {
-  CloseCircleOutlined,
   EyeOutlined,
+  SyncOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import readExcelFile from "../service/ReadFile";
@@ -32,6 +32,7 @@ interface metaData {
 interface ExcelData {
   data: Record<any, any>;
   id?: string;
+  url:string;
 }
 const RequestPage: React.FC = () => {
   const session = useAppStore().session?.userId;
@@ -98,7 +99,7 @@ const RequestPage: React.FC = () => {
       temp.push(
         {
           title: "sign Date",
-          dataIndex: "signDate",
+          dataIndex: "signedDate",
           key: "signDate",
         },
         {
@@ -109,7 +110,7 @@ const RequestPage: React.FC = () => {
             if (msg)
               return (
                 <Tooltip title={msg} placement="top">
-                  <CloseCircleOutlined />
+                  <Tag color="error">Rajected</Tag>
                 </Tooltip>
               );
             else return <></>;
@@ -120,9 +121,15 @@ const RequestPage: React.FC = () => {
           dataIndex: "signStatus",
           key: "requestStatus",
           render: (status: number) => {
-            if (status == 3) return <>Delegated</>;
+            if (status == signStatus.delegated) return <>Delegated</>;
             else if (status == 0) return <>Unsigned</>;
             else if (status == 5) return <>Signed</>;
+            else if (status == signStatus.inProcess)
+              return (
+                <Tag icon={<SyncOutlined spin />} color="processing">
+                  Processing
+                </Tag>
+              );
           },
         },
         {
@@ -131,7 +138,14 @@ const RequestPage: React.FC = () => {
           key: "Action",
           render: (status: number, record: ExcelData) => {
             if (status == 3)
-              return <Button icon={<EyeOutlined />}>Preview</Button>;
+              return (
+                <Link
+                  to={`${backendUrl}/templates/${templateId}/preview/${record?.id}`}
+                  target="_blank"
+                >
+                  <Button icon={<EyeOutlined />}></Button>
+                </Link>
+              );
             else if (status == 0)
               return (
                 <Flex justify="spce-around" gap={10}>
@@ -146,21 +160,26 @@ const RequestPage: React.FC = () => {
                       Delete
                     </Button>
                   )}
-                  {metadata.assignedTo === session && (
-                    <Button
-                      danger
-                      onClick={() => {
-                        setCurrentReject(record);
-                        setReject(true);
-                      }}
-                    >
-                      Reject
-                    </Button>
-                  )}
+                  {metadata.assignedTo === session &&
+                    metadata.signStatus == signStatus.readyForSign && (
+                      <Button
+                        danger
+                        onClick={() => {
+                          setCurrentReject(record);
+                          setReject(true);
+                        }}
+                      >
+                        Reject
+                      </Button>
+                    )}
                 </Flex>
               );
             else if (status == 5)
-              return <Button type="primary">Download</Button>;
+              return (
+                <Link to={`${backendUrl}${record?.url}`} target="_blank">
+                  <Button icon={<EyeOutlined />}>View</Button>
+                </Link>
+              );
           },
         }
       );
@@ -225,8 +244,8 @@ const RequestPage: React.FC = () => {
     >
       <CustomTable
         serialNumberConfig={{
-          name: "",
-          show: false,
+          name: "Sr",
+          show: true,
         }}
         columns={columns}
         data={ExcelData}
