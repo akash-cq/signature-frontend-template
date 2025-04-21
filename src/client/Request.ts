@@ -56,7 +56,10 @@ export class RequestClient extends Client {
     data.rejectCount = 0;
     return data;
   }
-  async sendExcelData(payload: any) {
+  async sendExcelData(payload: {
+    data:any;
+    templateId:string | undefined
+  }) {
     const data = payload.data;
     const templateId = payload.templateId;
     const res = await this.request("PATCH", `/api/templates/${templateId}`, {
@@ -64,7 +67,9 @@ export class RequestClient extends Client {
     });
     return res.data;
   }
-  async getDataExcel(id: string) {
+  async getDataExcel(id: string | undefined) {
+        if (!id) throw new Error("no Template id provided");
+
     const res = await this.request("GET", `/api/templates/${id}`);
     if (res.status != 200) {
       throw new Error("invalid data for backend");
@@ -76,7 +81,9 @@ export class RequestClient extends Client {
     const metadata = res.data?.metadata;
     return [data, headers, url, metadata];
   }
-  async deleteRequest(id: string) {
+  async deleteRequest(id: string | undefined) {
+        if (!id) throw new Error("no Template id provided");
+
     await this.request("DELETE", `/api/templates/${id}`);
     return;
   }
@@ -86,14 +93,15 @@ export class RequestClient extends Client {
     });
     return res;
   }
-  async deleteExcelEntry(data: any, templateId: string) {
+  async deleteExcelEntry(data: any, templateId: string | undefined) {
+    if(!templateId) throw new Error("no Template id provided")
     await this.request(
       "DELETE",
       `/api/templates/entry/${templateId}/${data.id}/`
     );
     return;
   }
-  async rejectDoc(data: object) {
+  async rejectDoc(data:any) {
     const res = await this.request("POST", "/api/templates/reject", {
       data: data,
     });

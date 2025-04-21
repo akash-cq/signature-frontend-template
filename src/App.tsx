@@ -4,6 +4,7 @@ import { useAppStore } from "./store";
 import { Router } from "./Router";
 import useMessage from "antd/es/message/useMessage";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import './client/socket/index'
 const App = () => {
 	const init = useAppStore().init;
 	const setMessageInstance = useAppStore().setMessageInstance;
@@ -38,7 +39,6 @@ const App = () => {
 			</div>
 		);
 	}
-
 	return (
 		<Spin size="large" spinning={appLoading}>
 			{messageContext}

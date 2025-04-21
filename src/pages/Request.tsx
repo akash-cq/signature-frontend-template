@@ -11,8 +11,10 @@ import {
   Input,
   Tooltip,
   Tag,
+  Typography,
 } from "antd";
 import {
+  ArrowDownOutlined,
   EyeOutlined,
   SyncOutlined,
   UploadOutlined,
@@ -28,6 +30,7 @@ interface metaData {
   createdBy: string;
   status: number;
   signStatus: number;
+  delegated?:string;
 }
 interface ExcelData {
   data: Record<any, any>;
@@ -38,7 +41,7 @@ const RequestPage: React.FC = () => {
   const session = useAppStore().session?.userId;
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-  const templateId: string | any = useParams()?.id;
+  const templateId: string | undefined = useParams()?.id;
   const [metadata, setMetaData] = useState<metaData | null>(null);
   const [rejectModal, setReject] = useState<boolean>(false);
   const [ModalDrawer, setModalDrawer] = useState<boolean>(false);
@@ -81,7 +84,7 @@ const RequestPage: React.FC = () => {
   const handleDelete = async (data: ExcelData) => {
     try {
       await requestClient.deleteExcelEntry(data, templateId);
-      setExcelData((prev) => prev.filter((obj: any) => data?.id != obj?.id));
+      setExcelData((prev) => prev.filter((obj: ExcelData) => data?.id != obj?.id));
       message.success("Succesfuly Deleted");
     } catch (error: any) {
       message.error(error.message);
@@ -101,6 +104,13 @@ const RequestPage: React.FC = () => {
           title: "sign Date",
           dataIndex: "signedDate",
           key: "signDate",
+          render: (data: string) => {
+            if(!data)return <></>
+            const date = new Date(data);
+            const formattedDate = ` ${date.getDate()},${date.toLocaleString("en-US", { month: "short" })} ${date.getFullYear()} ${date.toLocaleString("en-US", { hour: "numeric", minute: "numeric", hour12: true })}`;
+
+            return <Typography.Text>{formattedDate}</Typography.Text>;
+          },
         },
         {
           title: "Reject Reason",
@@ -176,9 +186,17 @@ const RequestPage: React.FC = () => {
               );
             else if (status == 5)
               return (
-                <Link to={`${backendUrl}${record?.url}`} target="_blank">
-                  <Button icon={<EyeOutlined />}>View</Button>
-                </Link>
+                <Flex justify="space-around">
+                  <Link to={`${backendUrl}${record?.url}`} target="_blank">
+                    <Button icon={<EyeOutlined />}></Button>
+                  </Link>
+                  <Link
+                    to={`${backendUrl}/template${record?.url}`}
+                    target="_blank"
+                  >
+                    <Button icon={<ArrowDownOutlined />}></Button>
+                  </Link>
+                </Flex>
               );
           },
         }
@@ -282,8 +300,8 @@ const RequestPage: React.FC = () => {
           </Form.Item>
           <Alert
             message="Note"
-            description="Excel File must have all needed placeholders related with this request's template otherwise download the excel file for Pre-Built headers"
-            type="info"
+            description="Excel File must have all needed placeholders related with this request's template otherwise download the excel file for Pre-Built headers don't include {IMAGE Signature()} and {QR_Code}"
+            type="warning"
             showIcon
           />
         </Form>

@@ -12,6 +12,7 @@ import {
   Select,
   Tag,
   Tooltip,
+  Typography,
   Upload,
 } from "antd";
 import MainAreaLayout from "../components/main-layout/main-layout";
@@ -19,18 +20,22 @@ import { useEffect, useState } from "react";
 import CustomTable from "../components/CustomTable";
 import { requestClient, signatureClient, useAppStore } from "../store";
 import {
+  ArrowDownOutlined,
+  CaretDownFilled,
+  CaretUpFilled,
   ClockCircleOutlined,
-  ProductOutlined,
-  SyncOutlined,
+  PrinterOutlined,
+    SyncOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { Link, useNavigate } from "react-router";
 import { signStatus } from "../libs/constants";
 import Search from "antd/es/transfer/search";
+import socket from "../client/socket";
 
 interface officers {
-  id: String;
-  name: String;
+  value: String;
+  label: String;
 }
 interface Images {
   id: string;
@@ -45,10 +50,11 @@ interface requests {
   url: string;
   signStatus: number;
   createdBy: string;
-  DocCount: any;
+  DocCount: number;
   delegationReason?: string;
   rejectCount: number;
   delegatedTo: string;
+  totalgenerated?: number;
 }
 const Requests: React.FC = () => {
   const navigate = useNavigate();
@@ -72,7 +78,22 @@ const Requests: React.FC = () => {
   const [, setCurrentPage] = useState<number>(1);
   const [form] = Form.useForm();
   const [OfficerForm] = Form.useForm();
-
+  const setDataIn = (data: requests) => {
+    setdata((prev) =>
+      prev.map((obj: requests) => {
+        if (obj.id === data.id) return data;
+        return obj;
+      })
+    );
+  };
+  useEffect(() => {
+    socket.on("generatedOneBatch", setDataIn);
+    socket.on("generatedEnd", setDataIn);
+    return () => {
+      socket.off("generatedOneBatch", setDataIn);
+      socket.off("generatedEnd", setDataIn);
+    };
+  }, [socket]);
   const fetchData = async () => {
     try {
       setLoading(true);
@@ -80,10 +101,12 @@ const Requests: React.FC = () => {
       console.log(requestsData);
       setdata(requestsData);
       const officersFromServer = await requestClient.getofficers();
-      const arr: any = officersFromServer.map((element) => ({
-        label: element.name,
-        value: element.id,
-      }));
+      const arr: officers[] = officersFromServer.map(
+        (element) => ({
+          label: element.name,
+          value: element.id,
+        })
+      );
       setOfficers(arr);
     } catch (error: any) {
       if (error.AxiosError.status != 404) message.error("Failed to fetch data");
@@ -148,7 +171,7 @@ const Requests: React.FC = () => {
   const deletRequest = async (id: string) => {
     try {
       await requestClient.deleteRequest(id);
-      setdata((prev) => prev.filter((obj: any) => obj.id != id));
+      setdata((prev) => prev.filter((obj: requests) => obj.id != id));
       message.success("Request is deleted");
     } catch (error: any) {
       message.error(error.message);
@@ -224,6 +247,16 @@ const Requests: React.FC = () => {
       message.error(error.message);
     }
   };
+  const sortNewest = () =>{
+    let sortedData = [...data];
+    sortedData.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
+    setdata(sortedData)
+  }
+  const sortOldest = ()=>{
+    let sortedData = [...data];
+    sortedData.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
+    setdata(sortedData)
+  }
   useEffect(() => {
     console.log(data, "ehvhedcvxv");
     if (data.length == 0) fetchData();
@@ -286,12 +319,22 @@ const Requests: React.FC = () => {
       },
     },
     {
-      title: "Created At",
+      title: (
+        <Flex justify="space-around" >
+          <span>CreatedAt</span>
+          <Flex justify="space-around" vertical>
+            <CaretUpFilled onClick={sortNewest}/>
+            <CaretDownFilled onClick={sortOldest}/>
+          </Flex>
+        </Flex>
+      ),
       dataIndex: "createdAt",
       key: "createdat",
-      render: (data: any) => {
+      render: (data: string) => {
         const date = new Date(data);
-        return <>{date.toUTCString()}</>;
+        const formattedDate = ` ${date.getDate()},${date.toLocaleString("en-US", { month: "short" })} ${date.getFullYear()} ${date.toLocaleString("en-US", { hour: "numeric", minute: "numeric", hour12: true })}`;
+
+        return <Typography.Text>{formattedDate}</Typography.Text>;
       },
     },
     {
@@ -323,7 +366,9 @@ const Requests: React.FC = () => {
           else if (text == signStatus.inProcess)
             return (
               <Tag icon={<SyncOutlined spin />} color="processing">
-                Processing
+                {record.totalgenerated
+                  ? `${record.totalgenerated} Processed`
+                  : "0 Processed"}
               </Tag>
             );
         } else {
@@ -333,22 +378,24 @@ const Requests: React.FC = () => {
                 Pending
               </Tag>
             );
-          } else if (text == 3) {
+          } else if (text == 3 || record.delegatedTo) {
             return (
               <Tooltip title={record.delegationReason} placement="top">
                 <Tag color="cyan">Delegated</Tag>
               </Tooltip>
             );
-          } else if (text == 5) {
+          } else if (text == 5 && !record.delegatedTo) {
             return <Tag color="success">Signed</Tag>;
           } else if (text == 6) {
             return <Tag>Ready For Dispatched</Tag>;
           } else if (text == signStatus.rejected)
             return <Tag color="error">Reject</Tag>;
-          else if (text == signStatus.inProcess)
+          else if (text == signStatus.inProcess && !record.delegatedTo)
             return (
               <Tag icon={<SyncOutlined spin />} color="processing">
-                Processing
+                {record.totalgenerated
+                  ? `${record.totalgenerated} Processed`
+                  : "0 Processed"}
               </Tag>
             );
         }
@@ -362,7 +409,7 @@ const Requests: React.FC = () => {
         if (request.createdBy === session || request?.delegatedTo === session) {
           if (action == signStatus.unsigned) {
             return (
-              <Flex justify="space-around" gap={5} vertical>
+              <Flex justify="space-around" gap={5}>
                 <Button
                   onClick={() => {
                     if (request.DocCount != 0)
@@ -392,6 +439,23 @@ const Requests: React.FC = () => {
                 <Button>Sign All</Button>
               </Popconfirm>
             );
+          } else if (action == signStatus.Signed) {
+            return (
+              <Flex justify="space-around" gap={10}>
+                <Link
+                  to={`${backendUrl}/template/downloads/${request?.id}`}
+                  target="_blank"
+                >
+                  <Button icon={<PrinterOutlined />}>Print All</Button>
+                </Link>
+                <Link
+                  to={`${backendUrl}/template/downloads/${request?.id}`}
+                  target="_blank"
+                >
+                  <Button icon={<ArrowDownOutlined />}>Download All</Button>
+                </Link>
+              </Flex>
+            );
           } else {
             <Button onClick={() => handleClone(request)}>Clone</Button>;
           }
@@ -415,6 +479,16 @@ const Requests: React.FC = () => {
                   Delegate
                 </Button>
               </Flex>
+            );
+          } else if (action == signStatus.Signed && !request.delegatedTo) {
+            return (
+              <Link
+                to={`${backendUrl}/template/downloads/${request?.id}`}
+                target="_blank"
+              >
+                {" "}
+                <Button icon={<ArrowDownOutlined />}>Download All</Button>
+              </Link>
             );
           } else {
             <Button onClick={() => handleClone(request)}>Clone</Button>;
@@ -498,8 +572,8 @@ const Requests: React.FC = () => {
           </Form.Item>
           <Alert
             message="Note"
-            description="Your template file must have Signature or QR_Code Placeholder otherwise file will be rejected. or placeholder must be in curly braces {}"
-            type="info"
+            description="Your template file must have {IMAGE Signature()} and QR_Code Placeholder otherwise file will be rejected. or placeholder must be in curly braces {} without any spaces except Signature"
+            type="warning"
             showIcon
           />
         </Form>
