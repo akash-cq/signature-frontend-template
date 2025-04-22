@@ -1,6 +1,5 @@
 import {
   Alert,
-  Avatar,
   Button,
   Card,
   Flex,
@@ -18,7 +17,7 @@ import {
   UploadOutlined,
 } from "@ant-design/icons";
 import { signatureClient } from "../store";
-import SignatureClient from "../client/signature";
+import { UploadChangeParam, UploadFile } from "antd/es/upload";
 interface Signature {
   id: string;
   url: string;
@@ -30,6 +29,8 @@ const Signatures: React.FC = () => {
   // const { Meta } = Card;
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
   const [setting, setSetting] = useState(false);
+  const [previewImage, setPreviewImage] = useState<string | null>(null);
+
   const [currentSign, setCurrentSign] = useState<Signature | null>(null);
   const [signatureData, setSignatureData] = useState<Signature[]>([]);
   const [ModalOpen, setModal] = useState(false);
@@ -66,8 +67,10 @@ const Signatures: React.FC = () => {
   const handleDeleteSign = async () => {
     try {
       if (!currentSign) throw new Error("sign is not selected");
-      const res = await signatureClient.deleteSignatures(currentSign)
-      setSignatureData((prev)=>prev.filter((obj:Signature)=>obj?.id!=currentSign?.id))
+      await signatureClient.deleteSignatures(currentSign);
+      setSignatureData((prev) =>
+        prev.filter((obj: Signature) => obj?.id != currentSign?.id)
+      );
       setSetting(false);
       setCurrentSign(null);
       message.success("deleted successfuly");
@@ -75,6 +78,19 @@ const Signatures: React.FC = () => {
       message.error(error.message);
     }
   };
+  
+const handlePreview = (info: UploadChangeParam<UploadFile<any>>) => {
+  console.log(info)
+  const file = info.fileList[0].originFileObj;
+  if (file && file.type.startsWith("image/")) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      setPreviewImage(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  }
+};
+
   useEffect(() => {
     fetchSignatures();
   }, []);
@@ -88,12 +104,12 @@ const Signatures: React.FC = () => {
       }
     >
       {signatureData.length != 0 && (
-        <Flex justify="space-around" gap={5} >
+        <Flex justify="space-around" gap={5}>
           {signatureData.map((obj: Signature) => {
             return (
               <Card
                 style={{ width: 200 }}
-                cover={<Image src={`${backendUrl}/${obj.url}`} width={200} />}
+                cover={<Image src={obj.url} width={200} />}
                 actions={[
                   <Button
                     icon={<SettingOutlined key="setting" />}
@@ -112,10 +128,32 @@ const Signatures: React.FC = () => {
         title="Add New Sign"
         open={ModalOpen}
         footer={null}
-        onCancel={() => setModal(false)}
+        onCancel={() =>{ setModal(false);form.resetFields();setPreviewImage(null)}}
         centered
       >
         <Form form={form} onFinish={handleImageSubmit}>
+          <div
+            style={{
+              width: 120,
+              height: 120,
+              border: "1px dashed #ccc",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              margin:'10px'
+            }}
+            
+          >
+            {previewImage && (
+              <Image
+                src={previewImage}
+                alt="preview"
+                width={130}
+                height={130}
+                style={{ objectFit: "cover" }}
+              />
+            )}
+          </div>
           <Form.Item
             label="Sign Upload "
             name="Sign"
@@ -126,6 +164,7 @@ const Signatures: React.FC = () => {
               beforeUpload={() => false}
               accept=".jpeg,.jpg,.bmp,.png"
               maxCount={1}
+              onChange={handlePreview}
             >
               <Button icon={<UploadOutlined />}>Upload Signature Image</Button>
             </Upload>
@@ -147,7 +186,10 @@ const Signatures: React.FC = () => {
         title="Signature Setting"
         open={setting}
         footer={null}
-        onCancel={() =>{setCurrentSign(null); setSetting(false)}}
+        onCancel={() => {
+          setCurrentSign(null);
+          setSetting(false);
+        }}
       >
         <Button icon={<DeleteOutlined />} danger onClick={handleDeleteSign}>
           Delete

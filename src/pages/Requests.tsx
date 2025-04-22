@@ -25,7 +25,7 @@ import {
   CaretUpFilled,
   ClockCircleOutlined,
   PrinterOutlined,
-    SyncOutlined,
+  SyncOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
 import { Link, useNavigate } from "react-router";
@@ -87,9 +87,12 @@ const Requests: React.FC = () => {
     );
   };
   useEffect(() => {
+    socket.on("generationStart", setDataIn);
     socket.on("generatedOneBatch", setDataIn);
     socket.on("generatedEnd", setDataIn);
     return () => {
+      socket.off("generationStart", setDataIn);
+
       socket.off("generatedOneBatch", setDataIn);
       socket.off("generatedEnd", setDataIn);
     };
@@ -101,12 +104,10 @@ const Requests: React.FC = () => {
       console.log(requestsData);
       setdata(requestsData);
       const officersFromServer = await requestClient.getofficers();
-      const arr: officers[] = officersFromServer.map(
-        (element) => ({
-          label: element.name,
-          value: element.id,
-        })
-      );
+      const arr: officers[] = officersFromServer.map((element) => ({
+        label: element.name,
+        value: element.id,
+      }));
       setOfficers(arr);
     } catch (error: any) {
       if (error.AxiosError.status != 404) message.error("Failed to fetch data");
@@ -192,7 +193,7 @@ const Requests: React.FC = () => {
   const handleOtpVerify = async (info: any) => {
     try {
       const res = await signatureClient.verifyOtp(info);
-      console.log(info);
+      console.log(res);
       form.resetFields();
       setOtpModal(false);
       getSign();
@@ -227,6 +228,7 @@ const Requests: React.FC = () => {
   const getOtp = async (data: requests) => {
     setRequest(data);
     const res = await signatureClient.getOtp(data);
+    console.log(res);
     setOtpModal(true);
   };
   const handleSendSign = (e: any) => {
@@ -242,24 +244,28 @@ const Requests: React.FC = () => {
         SignatureId: CurrentImage?.id,
       };
       const res = await signatureClient.StartSigning(payload);
+      console.log(res);
       message.success("start signing process");
     } catch (error: any) {
       message.error(error.message);
     }
   };
-  const sortNewest = () =>{
+  const sortNewest = () => {
     let sortedData = [...data];
-    sortedData.sort((a, b) => +new Date(a.createdAt) - +new Date(b.createdAt));
-    setdata(sortedData)
-  }
-  const sortOldest = ()=>{
+    sortedData.sort(
+      (a, b) => Number(new Date(a.createdAt)) - Number(new Date(b.createdAt))
+    );
+    setdata(sortedData);
+  };
+  const sortOldest = () => {
     let sortedData = [...data];
-    sortedData.sort((a, b) => +new Date(b.createdAt) - +new Date(a.createdAt));
-    setdata(sortedData)
-  }
+    sortedData.sort(
+      (a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt))
+    );
+    setdata(sortedData);
+  };
   useEffect(() => {
-    console.log(data, "ehvhedcvxv");
-    if (data.length == 0) fetchData();
+    fetchData();
   }, []);
 
   {
@@ -320,11 +326,11 @@ const Requests: React.FC = () => {
     },
     {
       title: (
-        <Flex justify="space-around" >
+        <Flex justify="space-around">
           <span>CreatedAt</span>
           <Flex justify="space-around" vertical>
-            <CaretUpFilled onClick={sortNewest}/>
-            <CaretDownFilled onClick={sortOldest}/>
+            <CaretUpFilled onClick={sortNewest} />
+            <CaretDownFilled onClick={sortOldest} />
           </Flex>
         </Flex>
       ),
@@ -342,55 +348,81 @@ const Requests: React.FC = () => {
       dataIndex: "signStatus",
       key: "rqststatus",
       render: (text: number, record: requests) => {
-        if (record.createdBy === session) {
-          if (text == 0) {
-            return <Tag>Draft</Tag>;
-          } else if (text == 1) {
-            return (
-              <Tag color="orange" icon={<ClockCircleOutlined />}>
-                Waiting For Sign
-              </Tag>
-            );
-          } else if (text == 3) {
-            return (
-              <Tooltip title={record.delegationReason} placement="top">
-                <Tag color="cyan">Delegated</Tag>
-              </Tooltip>
-            );
-          } else if (text == 5) {
-            return <Tag color="success">Signed</Tag>;
-          } else if (text == 6) {
-            return <Tag>Ready For Dispatched</Tag>;
-          } else if (text == signStatus.rejected)
-            return <Tag color="error">Reject</Tag>;
-          else if (text == signStatus.inProcess)
-            return (
-              <Tag icon={<SyncOutlined spin />} color="processing">
-                {record.totalgenerated
-                  ? `${record.totalgenerated} Processed`
-                  : "0 Processed"}
-              </Tag>
-            );
+        const isCreatedByUser = record.createdBy === session;
+        const isDelegated = text === 3 || record.delegatedTo;
+        const isRejected = text === signStatus.rejected;
+        const isInProcess = text === signStatus.inProcess;
+
+        if (isCreatedByUser) {
+          switch (text) {
+            case 0:
+              return <Tag>Draft</Tag>;
+
+            case 1:
+              return (
+                <Tag color="orange" icon={<ClockCircleOutlined />}>
+                  Waiting For Sign
+                </Tag>
+              );
+
+            case 3:
+              return (
+                <Tooltip title={record.delegationReason} placement="top">
+                  <Tag color="cyan">Delegated</Tag>
+                </Tooltip>
+              );
+
+            case 5:
+              return <Tag color="success">Signed</Tag>;
+
+            case 6:
+              return <Tag>Ready For Dispatched</Tag>;
+
+            default:
+              if (isRejected) {
+                return <Tag color="error">Reject</Tag>;
+              }
+
+              if (isInProcess) {
+                return (
+                  <Tag icon={<SyncOutlined spin />} color="processing">
+                    {record.totalgenerated
+                      ? `${record.totalgenerated} Processed`
+                      : "0 Processed"}
+                  </Tag>
+                );
+              }
+          }
         } else {
-          if (text == 1) {
+          if (text === 1) {
             return (
               <Tag color="magenta" icon={<ClockCircleOutlined />}>
                 Pending
               </Tag>
             );
-          } else if (text == 3 || record.delegatedTo) {
+          }
+
+          if (isDelegated) {
             return (
               <Tooltip title={record.delegationReason} placement="top">
                 <Tag color="cyan">Delegated</Tag>
               </Tooltip>
             );
-          } else if (text == 5 && !record.delegatedTo) {
+          }
+
+          if (text === 5 && !record.delegatedTo) {
             return <Tag color="success">Signed</Tag>;
-          } else if (text == 6) {
+          }
+
+          if (text === 6) {
             return <Tag>Ready For Dispatched</Tag>;
-          } else if (text == signStatus.rejected)
+          }
+
+          if (isRejected) {
             return <Tag color="error">Reject</Tag>;
-          else if (text == signStatus.inProcess && !record.delegatedTo)
+          }
+
+          if (isInProcess && !record.delegatedTo) {
             return (
               <Tag icon={<SyncOutlined spin />} color="processing">
                 {record.totalgenerated
@@ -398,69 +430,94 @@ const Requests: React.FC = () => {
                   : "0 Processed"}
               </Tag>
             );
+          }
         }
+
+        return <></>; // Fallback if no condition matches
       },
     },
+
     {
       title: "Action",
       dataIndex: "signStatus",
       key: "action",
       render: (action: number, request: requests) => {
-        if (request.createdBy === session || request?.delegatedTo === session) {
-          if (action == signStatus.unsigned) {
-            return (
-              <Flex justify="space-around" gap={5}>
-                <Button
-                  onClick={() => {
-                    if (request.DocCount != 0)
-                      setOfficerDrawer(true), setRequest(request);
-                    else message.error("no document is uploaded");
-                  }}
-                >
-                  Send
-                </Button>
-                <Popconfirm
-                  title="Delete this court?"
-                  onConfirm={() => deletRequest(request.id)}
-                >
-                  <Button danger>Delete</Button>
-                </Popconfirm>
+        const isOwnerOrDelegate =
+          request.createdBy === session || request.delegatedTo === session;
+
+        // Actions for request creator or delegated user
+        if (isOwnerOrDelegate) {
+          switch (action) {
+            case signStatus.unsigned:
+              return (
+                <Flex justify="space-around" gap={5}>
+                  <Button
+                    onClick={() => {
+                      if (request.DocCount !== 0) {
+                        setOfficerDrawer(true);
+                        setRequest(request);
+                      } else {
+                        message.error("No document is uploaded");
+                      }
+                    }}
+                  >
+                    Send
+                  </Button>
+                  <Popconfirm
+                    title="Delete this court?"
+                    onConfirm={() => deletRequest(request.id)}
+                  >
+                    <Button danger>Delete</Button>
+                  </Popconfirm>
+                  <Button onClick={() => handleClone(request)}>Clone</Button>
+                </Flex>
+              );
+
+            case signStatus.readyForSign:
+              return (
                 <Button onClick={() => handleClone(request)}>Clone</Button>
-              </Flex>
-            );
-          } else if (action == signStatus.readyForSign) {
-            return <Button onClick={() => handleClone(request)}>Clone</Button>;
-          } else if (action === signStatus.delegated) {
-            return (
-              <Popconfirm
-                title="Are you sure to sign all?"
-                onConfirm={() => getOtp(request)}
-              >
-                <Button>Sign All</Button>
-              </Popconfirm>
-            );
-          } else if (action == signStatus.Signed) {
-            return (
-              <Flex justify="space-around" gap={10}>
-                <Link
-                  to={`${backendUrl}/template/downloads/${request?.id}`}
-                  target="_blank"
+              );
+
+            case signStatus.delegated:
+              return (
+                <Popconfirm
+                  title="Are you sure to sign all?"
+                  onConfirm={() => getOtp(request)}
                 >
-                  <Button icon={<PrinterOutlined />}>Print All</Button>
-                </Link>
-                <Link
-                  to={`${backendUrl}/template/downloads/${request?.id}`}
-                  target="_blank"
-                >
-                  <Button icon={<ArrowDownOutlined />}>Download All</Button>
-                </Link>
-              </Flex>
-            );
-          } else {
-            <Button onClick={() => handleClone(request)}>Clone</Button>;
+                  <Button>Sign All</Button>
+                </Popconfirm>
+              );
+
+            case signStatus.Signed:
+              return (
+                <Flex justify="space-around" gap={10}>
+                  {/* <Link
+                    to={`${backendUrl}/template/downloads/${request?.id}`}
+                    target="_blank"
+                  >
+                    <Button icon={<PrinterOutlined />}>Print All</Button>
+                  </Link> */}
+                  <Button onClick={() => handleClone(request)}>Clone</Button>
+
+                  <Link
+                    to={`${backendUrl}/template/downloads/${request?.id}`}
+                    target="_blank"
+                  >
+                    <Button icon={<ArrowDownOutlined />}>Download All</Button>
+                  </Link>
+                </Flex>
+              );
+
+            default:
+              return (
+                <Button onClick={() => handleClone(request)}>Clone</Button>
+              );
           }
-        } else {
-          if (action == signStatus.readyForSign) {
+        }
+
+        // Actions for other users (not the creator or delegated user)
+        switch (action) {
+          case signStatus.readyForSign:
             return (
               <Flex justify="space-around" gap={6} vertical>
                 <Popconfirm
@@ -480,19 +537,26 @@ const Requests: React.FC = () => {
                 </Button>
               </Flex>
             );
-          } else if (action == signStatus.Signed && !request.delegatedTo) {
-            return (
-              <Link
-                to={`${backendUrl}/template/downloads/${request?.id}`}
-                target="_blank"
-              >
-                {" "}
-                <Button icon={<ArrowDownOutlined />}>Download All</Button>
-              </Link>
-            );
-          } else {
-            <Button onClick={() => handleClone(request)}>Clone</Button>;
-          }
+
+          case signStatus.Signed:
+            if (!request.delegatedTo) {
+              return (
+                <Flex justify="space-around" gap={10}>
+                  <Button onClick={() => handleClone(request)}>Clone</Button>
+
+                  <Link
+                    to={`${backendUrl}/template/downloads/${request?.id}`}
+                    target="_blank"
+                  >
+                    <Button icon={<ArrowDownOutlined />}>Download All</Button>
+                  </Link>
+                </Flex>
+              );
+            }
+            break;
+
+          default:
+            return <Button onClick={() => handleClone(request)}>Clone</Button>;
         }
       },
     },
@@ -653,7 +717,7 @@ const Requests: React.FC = () => {
         <Form onFinish={selectAndSign}>
           {CurrentImage && (
             <div style={{ border: "1px solid grey", display: "inline-block" }}>
-              <Image src={`${backendUrl}/${CurrentImage?.url}`} width={100} />
+              <Image src={CurrentImage?.url} width={100} />
             </div>
           )}
           <Form.Item>
@@ -664,11 +728,7 @@ const Requests: React.FC = () => {
                 value: obj,
                 label: (
                   <div style={{ textAlign: "center" }}>
-                    <Image
-                      src={`${backendUrl}/${obj.url}`}
-                      preview={false}
-                      width={100}
-                    />
+                    <Image src={obj?.url} preview={false} width={100} />
                   </div>
                 ),
               }))}

@@ -30,12 +30,12 @@ interface metaData {
   createdBy: string;
   status: number;
   signStatus: number;
-  delegated?:string;
+  delegated?: string;
 }
 interface ExcelData {
   data: Record<any, any>;
   id?: string;
-  url:string;
+  url: string;
 }
 const RequestPage: React.FC = () => {
   const session = useAppStore().session?.userId;
@@ -52,7 +52,7 @@ const RequestPage: React.FC = () => {
   const [columns, setColumns] = useState<Object[]>([]);
   const [, setCurrentPage] = useState<number>(1);
   const updatingData = (d: any) => {
-    const finalCalculateData:ExcelData[] = d.data.map((obj: any) => {
+    const finalCalculateData: ExcelData[] = d.data.map((obj: any) => {
       obj.data.id = obj.id;
       obj.data.signStatus = obj.signStatus;
       if (obj?.rejectionReason) obj.data.rejectionReason = obj.rejectionReason;
@@ -84,7 +84,9 @@ const RequestPage: React.FC = () => {
   const handleDelete = async (data: ExcelData) => {
     try {
       await requestClient.deleteExcelEntry(data, templateId);
-      setExcelData((prev) => prev.filter((obj: ExcelData) => data?.id != obj?.id));
+      setExcelData((prev) =>
+        prev.filter((obj: ExcelData) => data?.id != obj?.id)
+      );
       message.success("Succesfuly Deleted");
     } catch (error: any) {
       message.error(error.message);
@@ -105,7 +107,7 @@ const RequestPage: React.FC = () => {
           dataIndex: "signedDate",
           key: "signDate",
           render: (data: string) => {
-            if(!data)return <></>
+            if (!data) return <></>;
             const date = new Date(data);
             const formattedDate = ` ${date.getDate()},${date.toLocaleString("en-US", { month: "short" })} ${date.getFullYear()} ${date.toLocaleString("en-US", { hour: "numeric", minute: "numeric", hour12: true })}`;
 
@@ -187,13 +189,10 @@ const RequestPage: React.FC = () => {
             else if (status == 5)
               return (
                 <Flex justify="space-around">
-                  <Link to={`${backendUrl}${record?.url}`} target="_blank">
+                  <Link to={`${record?.url}?preview=yes`} target="_blank">
                     <Button icon={<EyeOutlined />}></Button>
                   </Link>
-                  <Link
-                    to={`${backendUrl}/template${record?.url}`}
-                    target="_blank"
-                  >
+                  <Link to={record?.url} target="_blank">
                     <Button icon={<ArrowDownOutlined />}></Button>
                   </Link>
                 </Flex>
@@ -254,7 +253,7 @@ const RequestPage: React.FC = () => {
           )}
           <Button type="primary">
             <Link to={`${backendUrl}/api/templates/download/${metadata?.id}`}>
-              Download Template
+              Download Excel Template
             </Link>
           </Button>
         </>

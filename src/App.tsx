@@ -32,6 +32,11 @@ const App = () => {
 		intialGetRequest();
 	}, [intialGetRequest]);
 
+	useEffect(()=>{
+		return ()=>{
+			localStorage.clear()
+		}
+	})
 	if (!initalSessionRequst) {
 		return (
 			<div className="flex justify-center items-center h-full w-full">
