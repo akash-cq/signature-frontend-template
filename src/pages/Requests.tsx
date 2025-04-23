@@ -10,6 +10,7 @@ import {
   Popconfirm,
   Radio,
   Select,
+  Space,
   Tag,
   Tooltip,
   Typography,
@@ -24,7 +25,6 @@ import {
   CaretDownFilled,
   CaretUpFilled,
   ClockCircleOutlined,
-  PrinterOutlined,
   SyncOutlined,
   UploadOutlined,
 } from "@ant-design/icons";
@@ -74,6 +74,7 @@ const Requests: React.FC = () => {
 
   const [CurrentImage, setCurrentImage] = useState<Images | null>(null);
   const [Request, setRequest] = useState<requests | null>(null);
+  const [name,setName] = useState<string>('');
   const [selectedOfficer, setSelectedOfficer] = useState<string>("");
   const [, setCurrentPage] = useState<number>(1);
   const [form] = Form.useForm();
@@ -183,7 +184,12 @@ const Requests: React.FC = () => {
   };
   const handleClone = async (data: requests) => {
     try {
-      const res = await requestClient.sendForClone(data);
+      const payload={
+        ...data,
+        templateName:name!="" ? name : data.templateName
+      }
+      setName("");
+      const res = await requestClient.sendForClone(payload);
       setdata((prev) => [...prev, res]);
       message.success("Succesfuly Request is Cloned");
     } catch (error: any) {
@@ -469,13 +475,25 @@ const Requests: React.FC = () => {
                   >
                     <Button danger>Delete</Button>
                   </Popconfirm>
-                  <Button onClick={() => handleClone(request)}>Clone</Button>
+                  <Popconfirm
+                    title={popconfirmContent(request)}
+                    onConfirm={() => handleClone(request)}
+                    onCancel={() => setName("")}
+                  >
+                    <Button>Clone</Button>
+                  </Popconfirm>{" "}
                 </Flex>
               );
 
             case signStatus.readyForSign:
               return (
-                <Button onClick={() => handleClone(request)}>Clone</Button>
+                <Popconfirm
+                  title={popconfirmContent(request)}
+                  onConfirm={() => handleClone(request)}
+                  onCancel={() => setName("")}
+                >
+                  <Button>Clone</Button>
+                </Popconfirm>
               );
 
             case signStatus.delegated:
@@ -497,8 +515,13 @@ const Requests: React.FC = () => {
                   >
                     <Button icon={<PrinterOutlined />}>Print All</Button>
                   </Link> */}
-                  <Button onClick={() => handleClone(request)}>Clone</Button>
-
+                  <Popconfirm
+                    title={popconfirmContent(request)}
+                    onConfirm={() => handleClone(request)}
+                    onCancel={() => setName("")}
+                  >
+                    <Button>Clone</Button>
+                  </Popconfirm>
                   <Link
                     to={`${backendUrl}/template/downloads/${request?.id}`}
                     target="_blank"
@@ -510,7 +533,13 @@ const Requests: React.FC = () => {
 
             default:
               return (
-                <Button onClick={() => handleClone(request)}>Clone</Button>
+                <Popconfirm
+                  title={popconfirmContent(request)}
+                  onConfirm={() => handleClone(request)}
+                  onCancel={() => setName("")}
+                >
+                  <Button>Clone</Button>
+                </Popconfirm>
               );
           }
         }
@@ -542,8 +571,13 @@ const Requests: React.FC = () => {
             if (!request.delegatedTo) {
               return (
                 <Flex justify="space-around" gap={10}>
-                  <Button onClick={() => handleClone(request)}>Clone</Button>
-
+                  <Popconfirm
+                    title={popconfirmContent(request)}
+                    onConfirm={() => handleClone(request)}
+                    onCancel={()=>setName('')}
+                  >
+                    <Button>Clone</Button>
+                  </Popconfirm>
                   <Link
                     to={`${backendUrl}/template/downloads/${request?.id}`}
                     target="_blank"
@@ -556,12 +590,36 @@ const Requests: React.FC = () => {
             break;
 
           default:
-            return <Button onClick={() => handleClone(request)}>Clone</Button>;
+            return (
+              <Popconfirm
+                title={popconfirmContent(request)}
+                onConfirm={() => handleClone(request)}
+                onCancel={() => setName("")}
+              >
+                <Button>Clone</Button>
+              </Popconfirm>
+            );
         }
       },
     },
   ];
 
+  const popconfirmContent = (request:requests)=>{
+    // setName(request.templateName)
+    return(
+    <div>
+      <div>Do you want to change the name before cloning?<br/>otherwise by default selected.</div>
+      <Space>
+        <label>New Name: </label>
+        <Input
+        value={name}
+          onChange={(e)=>setName(e.target.value)}
+          placeholder={`${request.templateName} can change`}
+        />
+      </Space>
+    </div>
+  );
+}
   return (
     /** main area layout */
     <MainAreaLayout
@@ -684,7 +742,7 @@ const Requests: React.FC = () => {
         </Form>
       </Modal>
 
-      {/** Delegat Modal  */}
+      {/** Delegate Modal  */}
       <Modal
         title="Delegate Document"
         open={delegatedModal}

@@ -122,7 +122,7 @@ const RequestPage: React.FC = () => {
             if (msg)
               return (
                 <Tooltip title={msg} placement="top">
-                  <Tag color="error">Rajected</Tag>
+                  <Tag color="error">Rejected</Tag>
                 </Tooltip>
               );
             else return <></>;
@@ -236,7 +236,7 @@ const RequestPage: React.FC = () => {
       title="Request Management"
       extra={
         <>
-          {metadata?.createdBy === session && (
+          {metadata?.createdBy === session && metadata?.signStatus==signStatus.unsigned &&(
             <Button
               type="primary"
               onClick={() => {
