@@ -67,14 +67,14 @@ const Requests: React.FC = () => {
   const [delegatedModal, setDelegatedModal] = useState<boolean>(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState<boolean>(false);
   const [officerDrawer, setOfficerDrawer] = useState<boolean>(false);
-
+  const [dispatchModal, setDispatchModal] = useState<boolean>(false);
   const [data, setdata] = useState<requests[]>([]);
   const [officers, setOfficers] = useState<officers[]>([]);
   const [signature, setSignatureData] = useState<Images[]>([]);
 
   const [CurrentImage, setCurrentImage] = useState<Images | null>(null);
   const [Request, setRequest] = useState<requests | null>(null);
-  const [name,setName] = useState<string>('');
+  const [name, setName] = useState<string>("");
   const [selectedOfficer, setSelectedOfficer] = useState<string>("");
   const [, setCurrentPage] = useState<number>(1);
   const [form] = Form.useForm();
@@ -184,10 +184,10 @@ const Requests: React.FC = () => {
   };
   const handleClone = async (data: requests) => {
     try {
-      const payload={
+      const payload = {
         ...data,
-        templateName:name!="" ? name : data.templateName
-      }
+        templateName: name != "" ? name : data.templateName,
+      };
       setName("");
       const res = await requestClient.sendForClone(payload);
       setdata((prev) => [...prev, res]);
@@ -269,6 +269,15 @@ const Requests: React.FC = () => {
       (a, b) => Number(new Date(b.createdAt)) - Number(new Date(a.createdAt))
     );
     setdata(sortedData);
+  };
+  const sendDispatch = async (info: any) => {
+    try {
+      const data = { ...Request, index: info.index };
+      const res = await requestClient.sendDispatch(data);
+      setRequest(null);
+    } catch (error: any) {
+      message.error(error.message);
+    }
   };
   useEffect(() => {
     fetchData();
@@ -383,7 +392,8 @@ const Requests: React.FC = () => {
 
             case 6:
               return <Tag>Ready For Dispatched</Tag>;
-
+            case 7:
+              return <Tag>Dispatched</Tag>;
             default:
               if (isRejected) {
                 return <Tag color="error">Reject</Tag>;
@@ -423,7 +433,10 @@ const Requests: React.FC = () => {
           if (text === 6) {
             return <Tag>Ready For Dispatched</Tag>;
           }
+          if(text==7){
+            return <Tag color="success">Dispatched</Tag>;
 
+          }
           if (isRejected) {
             return <Tag color="error">Reject</Tag>;
           }
@@ -509,12 +522,6 @@ const Requests: React.FC = () => {
             case signStatus.Signed:
               return (
                 <Flex justify="space-around" gap={10}>
-                  {/* <Link
-                    to={`${backendUrl}/template/downloads/${request?.id}`}
-                    target="_blank"
-                  >
-                    <Button icon={<PrinterOutlined />}>Print All</Button>
-                  </Link> */}
                   <Popconfirm
                     title={popconfirmContent(request)}
                     onConfirm={() => handleClone(request)}
@@ -528,9 +535,42 @@ const Requests: React.FC = () => {
                   >
                     <Button icon={<ArrowDownOutlined />}>Download All</Button>
                   </Link>
+                  {request.delegatedTo && (
+                    <Button
+                      onClick={() => {
+                        setRequest(request);
+                        setDispatchModal(true);
+                      }}
+                    >
+                      Send For dispatch
+                    </Button>
+                  )}
                 </Flex>
               );
-
+            case signStatus.dispatched:
+              return (
+                <Flex justify="space-around" gap={10}>
+                  <Popconfirm
+                    title={popconfirmContent(request)}
+                    onConfirm={() => handleClone(request)}
+                    onCancel={() => setName("")}
+                  >
+                    <Button>Clone</Button>
+                  </Popconfirm>
+                  <Popconfirm
+                    title="Delete this court?"
+                    onConfirm={() => deletRequest(request.id)}
+                  >
+                    <Button danger>Delete</Button>
+                  </Popconfirm>{" "}
+                  <Link
+                    to={`${backendUrl}/template/downloads/${request?.id}`}
+                    target="_blank"
+                  >
+                    <Button icon={<ArrowDownOutlined />}>Download All</Button>
+                  </Link>
+                </Flex>
+              );
             default:
               return (
                 <Popconfirm
@@ -574,7 +614,7 @@ const Requests: React.FC = () => {
                   <Popconfirm
                     title={popconfirmContent(request)}
                     onConfirm={() => handleClone(request)}
-                    onCancel={()=>setName('')}
+                    onCancel={() => setName("")}
                   >
                     <Button>Clone</Button>
                   </Popconfirm>
@@ -584,11 +624,54 @@ const Requests: React.FC = () => {
                   >
                     <Button icon={<ArrowDownOutlined />}>Download All</Button>
                   </Link>
+                  <Button
+                    onClick={() => {
+                      setRequest(request);
+                      setDispatchModal(true);
+                    }}
+                  >
+                    Send For dispatch
+                  </Button>
                 </Flex>
               );
             }
             break;
-
+          case signStatus.dispatched:
+            if (!request.delegatedTo) {
+              return (
+                <Flex justify="space-around" gap={10}>
+                  <Popconfirm
+                    title={popconfirmContent(request)}
+                    onConfirm={() => handleClone(request)}
+                    onCancel={() => setName("")}
+                  >
+                    <Button>Clone</Button>
+                  </Popconfirm>
+                  <Popconfirm
+                    title="Delete this court?"
+                    onConfirm={() => deletRequest(request.id)}
+                  >
+                    <Button danger>Delete</Button>
+                  </Popconfirm>{" "}
+                  <Link
+                    to={`${backendUrl}/template/downloads/${request?.id}`}
+                    target="_blank"
+                  >
+                    <Button icon={<ArrowDownOutlined />}>Download All</Button>
+                  </Link>
+                </Flex>
+              );
+            }else{
+                return (
+                  <Popconfirm
+                    title={popconfirmContent(request)}
+                    onConfirm={() => handleClone(request)}
+                    onCancel={() => setName("")}
+                  >
+                    <Button>Clone</Button>
+                  </Popconfirm>
+                );
+            }
           default:
             return (
               <Popconfirm
@@ -604,22 +687,26 @@ const Requests: React.FC = () => {
     },
   ];
 
-  const popconfirmContent = (request:requests)=>{
+  const popconfirmContent = (request: requests) => {
     // setName(request.templateName)
-    return(
-    <div>
-      <div>Do you want to change the name before cloning?<br/>otherwise by default selected.</div>
-      <Space>
-        <label>New Name: </label>
-        <Input
-        value={name}
-          onChange={(e)=>setName(e.target.value)}
-          placeholder={`${request.templateName} can change`}
-        />
-      </Space>
-    </div>
-  );
-}
+    return (
+      <div>
+        <div>
+          Do you want to change the name before cloning?
+          <br />
+          otherwise by default selected.
+        </div>
+        <Space>
+          <label>New Name: </label>
+          <Input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            placeholder={`${request.templateName} can change`}
+          />
+        </Space>
+      </div>
+    );
+  };
   return (
     /** main area layout */
     <MainAreaLayout
@@ -795,6 +882,28 @@ const Requests: React.FC = () => {
           <Form.Item>
             <Button type="primary" htmlType="submit">
               Sign
+            </Button>
+          </Form.Item>
+        </Form>
+      </Modal>
+
+      <Modal
+        title="Enter Dispatch Index"
+        open={dispatchModal}
+        onCancel={() => setDispatchModal(false)}
+        footer={null}
+      >
+        <Form onFinish={sendDispatch} form={form}>
+          <Form.Item
+            label="Enter Index"
+            name="index"
+            rules={[{ required: true }]}
+          >
+            <Input placeholder="Enter index number"></Input>
+          </Form.Item>
+          <Form.Item>
+            <Button htmlType="submit" type="primary">
+              Submit
             </Button>
           </Form.Item>
         </Form>

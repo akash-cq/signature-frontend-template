@@ -122,4 +122,10 @@ export class RequestClient extends Client {
     });
     return res.data;
   }
+  async sendDispatch(data:Object){
+    const res = await this.request("POST", "/api/disptach", {
+      data,
+    });
+    return res.data;
+  }
 }
