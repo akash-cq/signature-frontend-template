@@ -41,16 +41,22 @@ const RequestPage: React.FC = () => {
   const session = useAppStore().session?.userId;
   const backendUrl = import.meta.env.VITE_BACKEND_URL;
 
-  const templateId: string | undefined = useParams()?.id;
-  const [metadata, setMetaData] = useState<metaData | null>(null);
   const [rejectModal, setReject] = useState<boolean>(false);
-  const [ModalDrawer, setModalDrawer] = useState<boolean>(false);
-  const [form] = Form.useForm();
-  const [currentReeject, setCurrentReject] = useState<ExcelData | null>(null);
   const [loading, setLoading] = useState<boolean>(false);
+  const [ModalDrawer, setModalDrawer] = useState<boolean>(false);
+  
   const [ExcelData, setExcelData] = useState<ExcelData[]>([]);
+  const [currentReeject, setCurrentReject] = useState<ExcelData | null>(null);
+  
+  const [metadata, setMetaData] = useState<metaData | null>(null);
+  
   const [columns, setColumns] = useState<Object[]>([]);
+  
   const [, setCurrentPage] = useState<number>(1);
+  
+  const [form] = Form.useForm();
+  const templateId: string | undefined = useParams()?.id;
+  
   const updatingData = (d: any) => {
     const finalCalculateData: ExcelData[] = d.data.map((obj: any) => {
       obj.data.id = obj.id;
@@ -58,10 +64,10 @@ const RequestPage: React.FC = () => {
       if (obj?.rejectionReason) obj.data.rejectionReason = obj.rejectionReason;
       return obj.data;
     });
-    console.log(d);
     setExcelData(finalCalculateData);
     return;
   };
+
   const uploadFile = async (info: any) => {
     try {
       setLoading(true);
@@ -92,6 +98,7 @@ const RequestPage: React.FC = () => {
       message.error(error.message);
     }
   };
+  
   const fetchData = async () => {
     try {
       const [data, headers, url, metadata] =
@@ -299,7 +306,7 @@ const RequestPage: React.FC = () => {
           </Form.Item>
           <Alert
             message="Note"
-            description="Excel File must have all needed placeholders related with this request's template otherwise download the excel file for Pre-Built headers don't include {IMAGE Signature()} and {QR_Code}"
+            description="Excel File must have all needed placeholders related with this request's template otherwise download the excel file for Pre-Built headers don't include {IMAGE Signature()} and {IMAGE QR_Code()}"
             type="warning"
             showIcon
           />

@@ -32,6 +32,7 @@ import { Link, useNavigate } from "react-router";
 import { signStatus } from "../libs/constants";
 import Search from "antd/es/transfer/search";
 import socket from "../client/socket";
+import { set } from "zod";
 
 interface officers {
   value: String;
@@ -274,6 +275,9 @@ const Requests: React.FC = () => {
     try {
       const data = { ...Request, index: info.index };
       const res = await requestClient.sendDispatch(data);
+      setDispatchModal(false);
+      form.resetFields();
+      window.open(res, "_blank", "noopener,noreferrer");
       setRequest(null);
     } catch (error: any) {
       message.error(error.message);
@@ -469,7 +473,7 @@ const Requests: React.FC = () => {
           switch (action) {
             case signStatus.unsigned:
               return (
-                <Flex justify="space-around" gap={5}>
+                <Flex justify="space-around" gap={5} vertical>
                   <Button
                     onClick={() => {
                       if (request.DocCount !== 0) {
@@ -483,7 +487,7 @@ const Requests: React.FC = () => {
                     Send
                   </Button>
                   <Popconfirm
-                    title="Delete this court?"
+                    title="Delete this Request?"
                     onConfirm={() => deletRequest(request.id)}
                   >
                     <Button danger>Delete</Button>
@@ -521,7 +525,7 @@ const Requests: React.FC = () => {
 
             case signStatus.Signed:
               return (
-                <Flex justify="space-around" gap={10}>
+                <Flex justify="space-around" gap={10} vertical>
                   <Popconfirm
                     title={popconfirmContent(request)}
                     onConfirm={() => handleClone(request)}
@@ -549,7 +553,7 @@ const Requests: React.FC = () => {
               );
             case signStatus.dispatched:
               return (
-                <Flex justify="space-around" gap={10}>
+                <Flex justify="space-around" gap={10} vertical>
                   <Popconfirm
                     title={popconfirmContent(request)}
                     onConfirm={() => handleClone(request)}
@@ -558,7 +562,7 @@ const Requests: React.FC = () => {
                     <Button>Clone</Button>
                   </Popconfirm>
                   <Popconfirm
-                    title="Delete this court?"
+                    title="Delete this Request?"
                     onConfirm={() => deletRequest(request.id)}
                   >
                     <Button danger>Delete</Button>
@@ -610,7 +614,7 @@ const Requests: React.FC = () => {
           case signStatus.Signed:
             if (!request.delegatedTo) {
               return (
-                <Flex justify="space-around" gap={10}>
+                <Flex justify="space-around" gap={10} vertical>
                   <Popconfirm
                     title={popconfirmContent(request)}
                     onConfirm={() => handleClone(request)}
@@ -639,7 +643,7 @@ const Requests: React.FC = () => {
           case signStatus.dispatched:
             if (!request.delegatedTo) {
               return (
-                <Flex justify="space-around" gap={10}>
+                <Flex justify="space-around" gap={10} vertical>
                   <Popconfirm
                     title={popconfirmContent(request)}
                     onConfirm={() => handleClone(request)}
@@ -647,12 +651,7 @@ const Requests: React.FC = () => {
                   >
                     <Button>Clone</Button>
                   </Popconfirm>
-                  <Popconfirm
-                    title="Delete this court?"
-                    onConfirm={() => deletRequest(request.id)}
-                  >
-                    <Button danger>Delete</Button>
-                  </Popconfirm>{" "}
+                
                   <Link
                     to={`${backendUrl}/template/downloads/${request?.id}`}
                     target="_blank"
@@ -781,7 +780,7 @@ const Requests: React.FC = () => {
           </Form.Item>
           <Alert
             message="Note"
-            description="Your template file must have {IMAGE Signature()} and QR_Code Placeholder otherwise file will be rejected. or placeholder must be in curly braces {} without any spaces except Signature"
+            description="Your template file must have {IMAGE Signature()} and {IMAGE QR_Code()} Placeholder otherwise file will be rejected. or placeholder must be in curly braces {} without any spaces except Signature"
             type="warning"
             showIcon
           />
